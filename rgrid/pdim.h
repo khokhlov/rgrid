@@ -5,29 +5,9 @@
 #ifndef RGRID_PDIM_H
 #define RGRID_PDIM_H
 
+#include "rgrid/types.h"
+
 namespace rgrid {
-	enum CartDir {
-		X = 0,
-		Y,
-		Z,
-		ALL_DIRS,
-		DIR_UNDEFINED
-	};
-
-	enum CartSide {
-		SIDE_LEFT = 0,
-		SIDE_RIGHT,
-		SIDE_ALL,
-		SIDE_UNDEFINED
-	};
-
-	enum CartDim {
-		DIM_1D = 0,
-		DIM_2D,
-		DIM_3D,
-		DIM_ALL
-	};
-
 	void ortDirs(const CartDir &axis, CartDir &dir1, CartDir &dir2)
 	{
 		if (axis == X) {
