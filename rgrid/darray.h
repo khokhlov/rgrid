@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "rgrid/pdim.h"
+#include "rgrid/utils.h"
 
 namespace rgrid {
 

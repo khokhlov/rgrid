@@ -8,23 +8,6 @@
 #include "rgrid/types.h"
 
 namespace rgrid {
-	void ortDirs(const CartDir &axis, CartDir &dir1, CartDir &dir2)
-	{
-		if (axis == X) {
-			dir1 = Y;
-			dir2 = Z;
-		} else if (axis == Y) {
-			dir1 = Z;
-			dir2 = X;
-		} else if (axis == Z) {
-			dir1 = X;
-			dir2 = Y;
-		} else {
-			dir1 = dir2 = DIR_UNDEFINED;
-		}
-	}
-
-
 template <typename T>
 class PDim {
 	public:
