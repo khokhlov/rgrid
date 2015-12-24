@@ -52,13 +52,13 @@ TEST_CASE(
 	d.resize(10);
 	d.alloc();
 	d.fill(1);
-	d(0) = 2;
-	d(9) = 3;
+	d(0, 0) = 2;
+	d(9, 0) = 3;
 	d.fillGhost(rgrid::X);
-	REQUIRE(d(-1) == 2);
-	REQUIRE(d(-2) == 2);
-	REQUIRE(d(10) == 3);
-	REQUIRE(d(11) == 3);
+	REQUIRE(d(-1, 0) == 2);
+	REQUIRE(d(-2, 0) == 2);
+	REQUIRE(d(10, 0) == 3);
+	REQUIRE(d(11, 0) == 3);
 }
 
 TEST_CASE(
@@ -70,13 +70,13 @@ TEST_CASE(
 	d.resize(10, 1, 1, 3, 0, 0);
 	d.alloc();
 	d.fill(1);
-	d(0) = 2;
-	d(9) = 3;
+	d(0, 0) = 2;
+	d(9, 0) = 3;
 	d.fillGhost(rgrid::X);
-	REQUIRE(d(-1) == 2);
-	REQUIRE(d(-2) == 2);
-	REQUIRE(d(-3) == 2);
-	REQUIRE(d(10) == 3);
-	REQUIRE(d(11) == 3);
-	REQUIRE(d(12) == 3);
+	REQUIRE(d(-1, 0) == 2);
+	REQUIRE(d(-2, 0) == 2);
+	REQUIRE(d(-3, 0) == 2);
+	REQUIRE(d(10, 0) == 3);
+	REQUIRE(d(11, 0) == 3);
+	REQUIRE(d(12, 0) == 3);
 }

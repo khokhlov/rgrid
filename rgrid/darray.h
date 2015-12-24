@@ -36,18 +36,18 @@ class DArray : public PDim<I> {
 		T &operator[](const I index) { return data[index]; }
 		const T &operator[](const I index) const { data[index]; }
 
-		T &val(const I i, const I j, const I k) { return data[this->ind(i, j, k)]; }
-		T &val(const I i, const I j) { return val(i, j, static_cast<T>(0)); }
-		T &val(const I i) { return val(i, static_cast<T>(0)); }
-		T &val(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3) { return data[this->ind(i1, d1, i2, d2, i3, d3)]; }
+		T &val(const I i, const I j, const I k, const I cn) { return data[this->ind(i, j, k) + cn * this->localSizeGhost()]; }
+		T &val(const I i, const I j, const I cn) { return val(i, j, static_cast<T>(0), cn); }
+		T &val(const I i, const I cn) { return val(i, static_cast<T>(0), cn); }
+		T &val(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3, const I cn) { return data[this->ind(i1, d1, i2, d2, i3, d3) + cn * this->localSizeGhost()]; }
 
-		T &operator()(const I i, const I j, const I k) { return val(i, j, k); }
-		T &operator()(const I i, const I j) { return (*this)(i, j, static_cast<I>(0)); }
-		T &operator()(const I i) { return (*this)(i, static_cast<I>(0)); }
+		T &operator()(const I i, const I j, const I k, const I cn) { return val(i, j, k, cn); }
+		T &operator()(const I i, const I j, const I cn) { return (*this)(i, j, static_cast<I>(0), cn); }
+		T &operator()(const I i, const I cn) { return (*this)(i, static_cast<I>(0), cn); }
 
-		const T &operator()(const I i, const I j, const I k) const { return data[this->ind(i, j, k)]; }
-		const T &operator()(const I i, const I j) const { return (*this)(i, j, static_cast<I>(0)); }
-		const T &operator()(const I i) const { return (*this)(i, static_cast<I>(0)); }
+		const T &operator()(const I i, const I j, const I k, const I cn) const { return data[this->ind(i, j, k) + cn * this->localSizeGhost()]; }
+		const T &operator()(const I i, const I j, const I cn) const { return (*this)(i, j, static_cast<I>(0), cn); }
+		const T &operator()(const I i, const I cn) const { return (*this)(i, static_cast<I>(0), cn); }
 		
 		/*void convert_to_storage(const StorageType &st);*/
 
@@ -71,7 +71,7 @@ void DArray<T, I>::alloc(const I &nc)
 template <typename T, typename I>
 void DArray<T, I>::fill(const T &v)
 {
-	for (I i = 0; i < this->localSizeGhost(); i++) { data[i] = v; }
+	for (I i = 0; i < this->localSizeGhost() * nc; i++) { data[i] = v; }
 }
 
 template <typename T, typename I>
@@ -92,10 +92,12 @@ void DArray<T, I>::fillGhost(const CartDir &d, const CartSide &s)
 	} else {
 		return;
 	}
-	for (I i = 0; i < this->localSize(ort1); i++) {
-		for (I j = 0; j < this->localSize(ort2); j++) {
-			for (I gs = 1; gs <= this->ghost(d); gs++) {
-				this->val(i, ort1, j, ort2, k - sign * gs, d) = this->val(i, ort1, j, ort2, k, d);
+	for (I cn = 0; cn < nc; cn++) {
+		for (I i = 0; i < this->localSize(ort1); i++) {
+			for (I j = 0; j < this->localSize(ort2); j++) {
+				for (I gs = 1; gs <= this->ghost(d); gs++) {
+					this->val(i, ort1, j, ort2, k - sign * gs, d, cn) = this->val(i, ort1, j, ort2, k, d, cn);
+				}
 			}
 		}
 	}
