@@ -7,9 +7,7 @@ include_directories(./)
 
 aux_source_directory(rgrid/src RGRID)
 
-set(USE_MPI 1)
 if(USE_MPI)
-
 set(CMAKE_CXX_COMPILER mpicxx)
 add_definitions(-DUSE_MPI)
 
