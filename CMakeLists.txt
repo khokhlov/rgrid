@@ -13,6 +13,12 @@ add_definitions(-DUSE_MPI)
 
 endif(USE_MPI)
 
+if(USE_OPENCL)
+add_definitions(-DUSE_OPENCL)
+find_package(OpenCL REQUIRED)
+include_directories(${OpenCL_INCLUDE_DIRS})
+endif(USE_OPENCL)
+
 add_library(rgrid SHARED ${RGRID})
 
 add_executable(test_darray tests/test_darray.cpp)
