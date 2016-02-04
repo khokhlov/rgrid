@@ -18,3 +18,11 @@ cd build_mpi
 cmake ../ -DUSE_MPI=1
 make clean
 make
+
+cd ..
+echo "Building with OpenCL support"
+mkdir -p build_opencl
+cd build_opencl
+cmake ../ -DUSE_OPENCL=1
+make clean
+make

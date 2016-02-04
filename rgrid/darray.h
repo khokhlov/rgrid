@@ -11,6 +11,8 @@
 #include "rgrid/pdim.h"
 #include "rgrid/utils.h"
 
+#include "rgrid/rgopencl.h"
+
 namespace rgrid {
 
 template <typename T, typename I>
@@ -20,10 +22,16 @@ class DArray : public PDim<I> {
 			STORAGE_SOA = 0,
 			STORAGE_AOS
 		};
-		DArray() : PDim<I>() {
-			st = STORAGE_SOA;
-			nc = 1;
-		}
+		
+		DArray() : PDim<I>(),
+#ifdef USE_OPENCL
+			clContextIsSet(false), 
+			clBufInitialized(false), 
+			clOnDevice(false), 
+#endif
+			st(STORAGE_SOA),
+			nc(1) {}
+		
 		void alloc() { alloc(static_cast<I>(1)); }
 		void alloc(const I &nc);
 
@@ -51,6 +59,44 @@ class DArray : public PDim<I> {
 		
 		/*void convert_to_storage(const StorageType &st);*/
 
+#ifdef USE_OPENCL
+	public:
+		/* Set OpenCL context to work with buffer */
+		void setCLContext(cl_context context);
+		
+		/* Set OpenCL command queue */
+		void setCLCQ(cl_command_queue cq);
+		
+		/* Get OpenCL data buffer to work in kernels. 
+		 * You must run setCLContext() and setCLCQ() before */
+		cl_mem &getCLBuffer();
+		
+		/* copy data from host to device */
+		void clHtoD();
+		
+		/* copy data from device to host */
+		void clDtoH();
+		
+	private:
+		void clInitBuffer();
+		
+		/* OpenCL context to work with buffer */
+		cl_context clContext;
+		
+		/* OpenCL command queue to work with buffer */
+		cl_command_queue clCQ;
+		
+		/* Data array on device */
+		cl_mem clBuffer;
+		
+		bool clContextIsSet;
+		bool clCQIsSet;
+		bool clBufInitialized;
+
+		/* true - data on device, false - data on host */
+		bool clOnDevice;
+#endif		
+	public:	
 		/* Data. */
 		std::vector<T> data;
 
@@ -102,6 +148,60 @@ void DArray<T, I>::fillGhost(const CartDir &d, const CartSide &s)
 		}
 	}
 }
+
+#ifdef USE_OPENCL
+
+template <typename T, typename I>
+void DArray<T, I>::setCLContext(cl_context context) {
+	this->clContext = context;
+	clContextIsSet = true;
+	clBufInitialized = false;
+}
+
+template <typename T, typename I>
+void DArray<T, I>::setCLCQ(cl_command_queue cq) {
+	this->clCQ = cq;
+	clCQIsSet = true;
+	clBufInitialized = false;
+}
+
+template <typename T, typename I>
+void DArray<T, I>::clInitBuffer() {
+	RG_ASSERT(clContextIsSet, "Call setCLContext() first");
+	RG_ASSERT(clCQIsSet, "Call setCLCQ() first");
+	cl_int err_code;
+	this->clBuffer = clCreateBuffer(this->clContext, CL_MEM_READ_WRITE, data.size() * sizeof(T), NULL, &err_code);
+	CHECK_CL_ERROR(err_code);
+	clBufInitialized = true;
+}
+
+template <typename T, typename I>
+cl_mem& DArray<T, I>::getCLBuffer() {
+	if (!clBufInitialized) clInitBuffer();
+	return this->clBuffer;
+}
+
+template <typename T, typename I>
+void DArray<T, I>::clHtoD() {
+	if (!clOnDevice) {
+		if (!clBufInitialized) clInitBuffer();
+		RG_ASSERT(clCQIsSet, "Call setCLCQ() first");
+		CHECK_CL_ERROR(clEnqueueWriteBuffer(clCQ, clBuffer, CL_TRUE, 0, data.size() * sizeof(T), &(data[0]), 0, NULL, NULL));
+		clOnDevice = true;
+	}
+}
+
+template <typename T, typename I>
+void DArray<T, I>::clDtoH() {
+	if (clOnDevice) {
+		RG_ASSERT(clCQIsSet, "Call setCLCQ() first");
+		CHECK_CL_ERROR(clEnqueueReadBuffer(clCQ, clBuffer, CL_TRUE, 0, data.size() * sizeof(T), &(data[0]), 0, NULL, NULL));
+		clOnDevice = false;
+	}
+}
+
+#endif // USE_OPENCL
+
 }; // rgrid
 
 #endif // RGRID_DARRAY_H
