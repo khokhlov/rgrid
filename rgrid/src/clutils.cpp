@@ -1,17 +1,12 @@
-#ifndef RG_OPENCL_H
-#define RG_OPENCL_H
+#include "rgrid/clutils.h"
 
-#ifdef USE_OPENCL
-
-#include "rgrid/utils.h"
 #include "CL/opencl.h"
+#include <iostream>
 
-#include <string>
-
-namespace rgopencl
+namespace clwrapper
 {
 
-std::string clErrorToStr(cl_int code)
+const char* clErrorToStr(cl_int code)
 {
 	switch (code)
 	{
@@ -91,15 +86,4 @@ std::string clErrorToStr(cl_int code)
 	}
 }
 
-} // namespace rgopencl
-
-#define CHECK_CL_ERROR(param) {\
-	cl_int rc = (param);\
-	if (rc != CL_SUCCESS) {\
-		RG_ASSERT(rc == CL_SUCCESS, rgopencl::clErrorToStr(rc))\
-	}\
-}
-
-#endif
-
-#endif
+} // namespace rgrid

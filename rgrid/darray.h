@@ -11,7 +11,8 @@
 #include "rgrid/pdim.h"
 #include "rgrid/utils.h"
 
-#include "rgrid/rgopencl.h"
+#include "rgrid/clwrapper.h"
+#include "rgrid/clutils.h"
 
 namespace rgrid {
 

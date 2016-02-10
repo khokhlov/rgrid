@@ -26,3 +26,6 @@ cd build_opencl
 cmake ../ -DUSE_OPENCL=1
 make clean
 make
+
+echo "Running OpenCL tests"
+./test_clwrapper
