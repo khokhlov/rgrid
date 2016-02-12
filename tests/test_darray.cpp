@@ -80,3 +80,22 @@ TEST_CASE(
 	REQUIRE(d(11, 0) == 3);
 	REQUIRE(d(12, 0) == 3);
 }
+
+TEST_CASE(
+		"DArray",
+		"components"
+	 )
+{
+	DArray d;
+	d.resize(2, 3, 4);
+	d.alloc(5);
+	d.fill(18);
+	for (int i = 0; i != 5; ++i) {
+		d(1, 0, 2, i) = 77+i;
+	}
+	d.fillGhost();
+	for (int i = 0; i != 5; ++i) {
+		REQUIRE(d(1, -1, 2, i) == d(1, 0, 2, i));
+		REQUIRE(d(1, -2, 2, i) == d(1, 0, 2, i));
+	}
+}

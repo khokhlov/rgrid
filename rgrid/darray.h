@@ -18,19 +18,13 @@ namespace rgrid {
 
 template <typename T, typename I>
 class DArray : public PDim<I> {
-	public:
-		enum StorageType {
-			STORAGE_SOA = 0,
-			STORAGE_AOS
-		};
-		
+	public:		
 		DArray() : PDim<I>(),
 #ifdef USE_OPENCL
 			clContextIsSet(false), 
 			clBufInitialized(false), 
 			clOnDevice(false), 
 #endif
-			st(STORAGE_SOA),
 			nc(1) {}
 		
 		void alloc() { alloc(static_cast<I>(1)); }
@@ -43,7 +37,6 @@ class DArray : public PDim<I> {
 		void fill(const T &v);
 
 		T &operator[](const I index) { return data[index]; }
-		const T &operator[](const I index) const { data[index]; }
 
 		T &val(const I i, const I j, const I k, const I cn) { return data[this->ind(i, j, k) + cn * this->localSizeGhost()]; }
 		T &val(const I i, const I j, const I cn) { return val(i, j, static_cast<T>(0), cn); }
@@ -57,9 +50,6 @@ class DArray : public PDim<I> {
 		const T &operator()(const I i, const I j, const I k, const I cn) const { return data[this->ind(i, j, k) + cn * this->localSizeGhost()]; }
 		const T &operator()(const I i, const I j, const I cn) const { return (*this)(i, j, static_cast<I>(0), cn); }
 		const T &operator()(const I i, const I cn) const { return (*this)(i, static_cast<I>(0), cn); }
-		
-		/*void convert_to_storage(const StorageType &st);*/
-
 #ifdef USE_OPENCL
 	public:
 		/* Set OpenCL context to work with buffer */
@@ -100,9 +90,6 @@ class DArray : public PDim<I> {
 	public:	
 		/* Data. */
 		std::vector<T> data;
-
-		/* Storage type. */
-		StorageType st;
 
 		/* Number of components. */
 		I nc;
