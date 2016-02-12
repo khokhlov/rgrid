@@ -5,6 +5,7 @@
 #include "rgrid/darray.h"
 
 #include <iostream>
+#include <complex>
 
 using namespace std;
 
@@ -98,4 +99,20 @@ TEST_CASE(
 		REQUIRE(d(1, -1, 2, i) == d(1, 0, 2, i));
 		REQUIRE(d(1, -2, 2, i) == d(1, 0, 2, i));
 	}
+}
+
+TEST_CASE(
+		"DArray",
+		"saveLoadText"
+	 )
+{
+	rgrid::DArray<std::complex< double >, int> d;
+	d.resize(3, 2, 1);
+	d.alloc(2);
+	d.fill(3);
+	d.fillGhost();
+	d.saveTextFile("testtextfile.txt");
+	d.loadFile("testtextfile.txt");
+	d.saveBinaryFile("testbinaryfile.txt");
+	d.loadFile("testbinaryfile.txt");
 }

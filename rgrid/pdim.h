@@ -76,7 +76,6 @@ class PDim {
 		bool isGhost(const T &i) { return isGhost(i, static_cast<T>(0)); }
 		bool isOnFace(const CartDir &d, const CartSide &s);
 
-		bool operator == (PDim<T> a);
 		CartDim dim();
 
 		const static int GHOST_SIZE = 2;
@@ -89,11 +88,13 @@ class PDim {
 		int local_stride[ALL_DIRS];
 	
 		int ghost_size[ALL_DIRS];
+		// size with ghost
 		int local_ghost_ext[ALL_DIRS];
+		// all grid size with ghost
 		int local_ghost_size;
 
 		int o[ALL_DIRS];
-	}; // PDim
+}; // PDim
 
 template <typename T>
 CartDim PDim<T>::dim()
@@ -120,12 +121,11 @@ bool PDim<T>::isGhost(const T &i, const T &j, const T &k)
 }
 
 template <typename T>
-bool PDim<T>::operator == (PDim<T> a)
-{
-	bool is1 = (all_ext[X] == a.all_ext[X]) && (all_ext[Y] == a.all_ext[Y]) && (all_ext[Z] == a.all_ext[Z]);
-	bool is2 = (local_ext[X] == a.local_ext[X]) && (local_ext[Y] == a.local_ext[Y]) && (local_ext[Z] == a.local_ext[Z]);
-	bool is3 = (ghost_size[X] == a.ghost_size[X]) && (ghost_size[Y] == a.ghost_size[Y]) && (ghost_size[Z] == a.ghost_size[Z]);
-	bool is4 = (o[X] == a.o[X]) && (o[Y] == a.o[Y]) && (o[Z] == a.o[Z]);
+bool operator==(const PDim<T>& lhs, const PDim<T>& rhs) {
+	bool is1 = (lhs.all_ext[X] == rhs.all_ext[X]) && (lhs.all_ext[Y] == rhs.all_ext[Y]) && (lhs.all_ext[Z] == rhs.all_ext[Z]);
+	bool is2 = (lhs.local_ext[X] == rhs.local_ext[X]) && (lhs.local_ext[Y] == rhs.local_ext[Y]) && (lhs.local_ext[Z] == rhs.local_ext[Z]);
+	bool is3 = (lhs.ghost_size[X] == rhs.ghost_size[X]) && (lhs.ghost_size[Y] == rhs.ghost_size[Y]) && (lhs.ghost_size[Z] == rhs.ghost_size[Z]);
+	bool is4 = (lhs.o[X] == rhs.o[X]) && (lhs.o[Y] == rhs.o[Y]) && (lhs.o[Z] == rhs.o[Z]);
 	return is1 && is2 && is3 && is4;
 }
 
