@@ -6,6 +6,7 @@
 #define RGRID_PDIM_H
 
 #include "rgrid/types.h"
+#include "rgrid/utils.h"
 
 namespace rgrid {
 template <typename T>
@@ -24,13 +25,13 @@ class PDim {
 		void resize(const T &x) { resize(x, static_cast<T>(1)); }
 		void resize_d(const CartDir &d1, const T &s1, const CartDir &d2, const T &s2, const CartDir &d3, const T &s3);
 
-		T ind(const T &x, const T &y, const T &z);
-		T ind(const T &x, const T &y) { return ind(x, y, static_cast<T>(0)); }
-		T ind(const T &x) { return ind(x, static_cast<T>(0)); }
+		T ind(const T &x, const T &y, const T &z) const;
+		T ind(const T &x, const T &y) const { return ind(x, y, static_cast<T>(0)); }
+		T ind(const T &x) const { return ind(x, static_cast<T>(0)); }
 
-		T ind(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3);
-		T ind(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2) { return ind(i1, d1, i2, d2, static_cast<T>(0), Z); }
-		T ind(const T &i1, const CartDir &d1) { return ind(i1, d1, static_cast<T>(0), Y); }
+		T ind(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3) const;
+		T ind(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2) const { return ind(i1, d1, i2, d2, static_cast<T>(0), Z); }
+		T ind(const T &i1, const CartDir &d1) const { return ind(i1, d1, static_cast<T>(0), Y); }
 
 		T ghost(const CartDir &d) const { return ghost_size[d]; }
 		T ghost() const { return ghost(X); }
@@ -76,7 +77,7 @@ class PDim {
 		bool isGhost(const T &i) { return isGhost(i, static_cast<T>(0)); }
 		bool isOnFace(const CartDir &d, const CartSide &s);
 
-		CartDim dim();
+		CartDim dim() const;
 
 		const static int GHOST_SIZE = 2;
 		int all_ext[ALL_DIRS];
@@ -97,7 +98,7 @@ class PDim {
 }; // PDim
 
 template <typename T>
-CartDim PDim<T>::dim()
+CartDim PDim<T>::dim() const
 {
 	CartDim d = DIM_3D;
 	if (size(Z) == 1) d = DIM_2D;
@@ -127,6 +128,11 @@ bool operator==(const PDim<T>& lhs, const PDim<T>& rhs) {
 	bool is3 = (lhs.ghost_size[X] == rhs.ghost_size[X]) && (lhs.ghost_size[Y] == rhs.ghost_size[Y]) && (lhs.ghost_size[Z] == rhs.ghost_size[Z]);
 	bool is4 = (lhs.o[X] == rhs.o[X]) && (lhs.o[Y] == rhs.o[Y]) && (lhs.o[Z] == rhs.o[Z]);
 	return is1 && is2 && is3 && is4;
+}
+
+template <typename T>
+bool operator!=(const PDim<T>& lhs, const PDim<T>& rhs) {
+	return !(lhs == rhs);
 }
 
 template <typename T>
@@ -180,13 +186,13 @@ T PDim<T>::localFromGlobal(const T& x, const T& y, const T& z)
 
 
 template <typename T>
-T PDim<T>::ind(const T& x, const T& y, const T& z)
+T PDim<T>::ind(const T& x, const T& y, const T& z) const
 {
 	return x + ghost_size[X] + (y + ghost_size[Y]) * local_stride[Y] + (z + ghost_size[Z]) * local_stride[Z];
 }
 
 template <typename T>
-T PDim<T>::ind(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3)
+T PDim<T>::ind(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3) const
 {
 	return (i1 + ghost_size[d1]) * local_stride[d1] + (i2 + ghost_size[d2]) * local_stride[d2] + (i3 + ghost_size[d3]) * local_stride[d3];
 }

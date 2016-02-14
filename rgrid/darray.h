@@ -39,19 +39,20 @@ class DArray : public PDim<I> {
 		void fill(const T &v);
 
 		T &operator[](const I index) { return data[index]; }
+		const T &operator[](const I index) const { return data[index]; }
 
 		T &val(const I i, const I j, const I k, const I cn) { return data[this->ind(i, j, k) + cn * this->localSizeGhost()]; }
 		T &val(const I i, const I j, const I cn) { return val(i, j, static_cast<T>(0), cn); }
 		T &val(const I i, const I cn) { return val(i, static_cast<T>(0), cn); }
 		T &val(const I &i1, const CartDir &d1, const I &i2, const CartDir &d2, const I &i3, const CartDir &d3, const I cn) { return data[this->ind(i1, d1, i2, d2, i3, d3) + cn * this->localSizeGhost()]; }
 
-		T &operator()(const I i, const I j, const I k, const I cn) { return val(i, j, k, cn); }
-		T &operator()(const I i, const I j, const I cn) { return (*this)(i, j, static_cast<I>(0), cn); }
-		T &operator()(const I i, const I cn) { return (*this)(i, static_cast<I>(0), cn); }
+		T &operator()(const I& i, const I& j, const I& k, const I& cn) { return val(i, j, k, cn); }
+		T &operator()(const I& i, const I& j, const I& cn) { return (*this)(i, j, static_cast<I>(0), cn); }
+		T &operator()(const I& i, const I& cn) { return (*this)(i, static_cast<I>(0), cn); }
 
-		const T &operator()(const I i, const I j, const I k, const I cn) const { return data[this->ind(i, j, k) + cn * this->localSizeGhost()]; }
-		const T &operator()(const I i, const I j, const I cn) const { return (*this)(i, j, static_cast<I>(0), cn); }
-		const T &operator()(const I i, const I cn) const { return (*this)(i, static_cast<I>(0), cn); }
+		const T &operator()(const I& i, const I& j, const I& k, const I& cn) const { return data[PDim<I>::ind(i, j, k) + cn * PDim<I>::localSizeGhost()]; }
+		const T &operator()(const I& i, const I& j, const I& cn) const { return (*this)(i, j, static_cast<I>(0), cn); }
+		const T &operator()(const I& i, const I& cn) const { return (*this)(i, static_cast<I>(0), cn); }
 		
 		// save darray to file named "name" in binary format
 		void saveBinaryFile(const char* name);
@@ -294,10 +295,17 @@ void DArray<T, I>::loadFile(const char* name)
 
 template <typename T, typename I>
 bool operator==(const DArray<T, I>& lhs, const DArray<T, I>& rhs) {
-	bool is1 = lhs.data == rhs.data;
-	bool is2 = lhs.nc == rhs.nc;
-	bool is3 = static_cast<PDim<I> >(lhs) == static_cast<PDim<I> >(rhs);
-	return is1 && is2 && is3;
+	if (&lhs == &rhs) return true;
+	if (static_cast<PDim<I> >(lhs) != static_cast<PDim<I> >(rhs)) return false;
+	if (lhs.nc != rhs.nc) return false;
+	// don't check ghost!
+	for (I c = 0; c != lhs.nc; ++c)
+	for (I k = 0; k != lhs.localSize(Z); ++k)
+	for (I j = 0; j != lhs.localSize(Y); ++j)
+	for (I i = 0; i != lhs.localSize(X); ++i) {
+		if (lhs(i, j, k, c) != rhs(i, j, k, c)) return false;
+	}
+	return true;
 }
 
 #ifdef USE_OPENCL

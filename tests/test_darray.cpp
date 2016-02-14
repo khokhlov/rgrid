@@ -5,7 +5,6 @@
 #include "rgrid/darray.h"
 
 #include <iostream>
-#include <complex>
 
 using namespace std;
 
@@ -21,9 +20,9 @@ TEST_CASE(
 	REQUIRE(d.localSize() == 0);
 	REQUIRE(d.data.size() == 0);
 	d.resize(1, 2, 3);
-	REQUIRE(d.data.size() != d.localSizeGhost());
+	REQUIRE((int)d.data.size() != d.localSizeGhost());
 	d.alloc();
-	REQUIRE(d.data.size() == d.localSizeGhost());
+	REQUIRE((int)d.data.size() == d.localSizeGhost());
 }
 
 TEST_CASE(
@@ -106,13 +105,15 @@ TEST_CASE(
 		"saveLoadText"
 	 )
 {
-	rgrid::DArray<std::complex< double >, int> d;
-	d.resize(3, 2, 1);
-	d.alloc(2);
-	d.fill(3);
-	d.fillGhost();
-	d.saveTextFile("testtextfile.txt");
-	d.loadFile("testtextfile.txt");
-	d.saveBinaryFile("testbinaryfile.txt");
-	d.loadFile("testbinaryfile.txt");
+	rgrid::DArray<int, int> d1, d2, d3;
+	d1.resize(7, 6, 5);
+	d1.alloc(5);
+	d1.fill(17.5);
+	d1.fillGhost();
+	d1.saveTextFile("testtextfile.txt");
+	d2.loadFile("testtextfile.txt");
+	REQUIRE(d1 == d2);
+	d1.saveBinaryFile("testbinaryfile.txt");
+	d3.loadFile("testbinaryfile.txt");
+	REQUIRE(d1 == d3);
 }
