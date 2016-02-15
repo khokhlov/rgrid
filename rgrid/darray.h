@@ -31,10 +31,14 @@ class DArray : public PDim<I> {
 		
 		void alloc() { alloc(static_cast<I>(1)); }
 		void alloc(const I &nc);
-
+		
 		void fillGhost(const CartDir &d, const CartSide &s);
 		void fillGhost(const CartDir &d) { fillGhost(d, SIDE_LEFT); fillGhost(d, SIDE_RIGHT); }
 		void fillGhost() { fillGhost(X); fillGhost(Y); fillGhost(Z); }
+		
+		// copy ghost nodes from "da"
+		// "d" and "s" relative to this DArray
+		void copyGhost(DArray<T, I>& da, const CartDir &d, const CartSide &s);
 
 		void fill(const T &v);
 
@@ -53,6 +57,9 @@ class DArray : public PDim<I> {
 		const T &operator()(const I& i, const I& j, const I& k, const I& cn) const { return data[PDim<I>::ind(i, j, k) + cn * PDim<I>::localSizeGhost()]; }
 		const T &operator()(const I& i, const I& j, const I& cn) const { return (*this)(i, j, static_cast<I>(0), cn); }
 		const T &operator()(const I& i, const I& cn) const { return (*this)(i, static_cast<I>(0), cn); }
+		
+		// get number of components
+		I getNC() const { return nc; };
 		
 		// save darray to file named "name" in binary format
 		void saveBinaryFile(const char* name);
@@ -119,6 +126,29 @@ template <typename T, typename I>
 void DArray<T, I>::fill(const T &v)
 {
 	for (I i = 0; i < this->localSizeGhost() * nc; i++) { data[i] = v; }
+}
+
+template <typename T, typename I>
+void DArray<T, I>::copyGhost(DArray<T, I>& da, const CartDir &d, const CartSide &s) {
+	CartDir ort1, ort2;
+	ortDirs(d, ort1, ort2);
+	I k = 0, kda = 0;
+	I sign;
+	if (s == SIDE_LEFT) {
+		k = 0;
+		kda = da.localSize(d) - 1;
+		sign = 1;
+	} else {
+		k = PDim<I>::localSize(d) - 1;
+		kda = 0;
+		sign = -1;
+	}
+	for (I cn = 0; cn < nc; cn++) 
+	for (I i = 0; i < PDim<I>::localSize(ort1); i++) 
+	for (I j = 0; j < PDim<I>::localSize(ort2); j++) 
+	for (I gs = 0; gs < PDim<I>::ghost(d); gs++) {
+		val(i, ort1, j, ort2, k - sign * (gs + 1), d, cn) = da.val(i, ort1, j, ort2, kda - sign * gs, d, cn);
+	}
 }
 
 template <typename T, typename I>
@@ -194,10 +224,7 @@ template <typename T, typename I>
 void DArray<T, I>::writeFileHeader(std::ofstream& f)
 {
 	f << "# DARRAY DATA FORMAT\n";
-	f << "LOCAL SIZE: " << this->localSize(X) << " " << this->localSize(Y) << " " << this->localSize(Z) << "\n";
-	f << "GLOBAL SIZE: " << this->size(X) << " " << this->size(Y) << " " << this->size(Z) << "\n";
-	f << "ORIGIN: " << this->origin(X) << " " << this->origin(Y) << " " << this->origin(Z) << "\n";
-	f << "GHOST SIZE: " << this->ghost(X) << " " << this->ghost(Y) << " " << this->ghost(Z) << "\n";
+	f << "SIZE: " << this->localSize(X) << " " << this->localSize(Y) << " " << this->localSize(Z) << "\n";
 	f << "COMPONENTS: " << this->nc << "\n";
 }
 
@@ -205,10 +232,7 @@ template <typename T, typename I>
 void DArray<T, I>::loadFileHeader(std::ifstream& f)
 {
 	// darray params
-	I localSize[ALL_DIRS];
-	I globalSize[ALL_DIRS];
-	I origin[ALL_DIRS];
-	I ghostSize[ALL_DIRS];
+	I size[ALL_DIRS];
 	I components;
 	
 	std::string str;
@@ -217,23 +241,8 @@ void DArray<T, I>::loadFileHeader(std::ifstream& f)
 	RG_ASSERT(0 == str.compare("# DARRAY DATA FORMAT"), "Wrong file format");
 	
 	std::getline(f, str, ':');	
-	RG_ASSERT(0 == str.compare("LOCAL SIZE"), "Wrong entry, LOCAL SIZE expected");
-	f >> localSize[X] >> localSize[Y] >> localSize[Z];
-	std::getline(f, str);
-	
-	std::getline(f, str, ':');
-	RG_ASSERT(0 == str.compare("GLOBAL SIZE"), "Wrong entry, GLOBAL SIZE expected");
-	f >> globalSize[X] >> globalSize[Y] >> globalSize[Z];
-	std::getline(f, str);
-	
-	std::getline(f, str, ':');
-	RG_ASSERT(0 == str.compare("ORIGIN"), "Wrong entry, ORIGIN expected");
-	f >> origin[X] >> origin[Y] >> origin[Z];
-	std::getline(f, str);
-	
-	std::getline(f, str, ':');
-	RG_ASSERT(0 == str.compare("GHOST SIZE"), "Wrong entry, GHOST SIZE expected");
-	f >> ghostSize[X] >> ghostSize[Y] >> ghostSize[Z];
+	RG_ASSERT(0 == str.compare("SIZE"), "Wrong entry, SIZE expected");
+	f >> size[X] >> size[Y] >> size[Z];
 	std::getline(f, str);
 	
 	std::getline(f, str, ':');
@@ -241,12 +250,8 @@ void DArray<T, I>::loadFileHeader(std::ifstream& f)
 	f >> components;
 	std::getline(f, str);
 
-	this->resize(
-		localSize[X], localSize[Y], localSize[Z],
-		globalSize[X], globalSize[Y], globalSize[Z],
-		origin[X], origin[Y], origin[Z],
-		ghostSize[X], ghostSize[Y], ghostSize[Z]);
-	this->alloc(components);
+	PDim<I>::resize(size[X], size[Y], size[Z]);
+	alloc(components);
 }
 
 template <typename T, typename I>

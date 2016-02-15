@@ -108,7 +108,7 @@ TEST_CASE(
 	rgrid::DArray<int, int> d1, d2, d3;
 	d1.resize(7, 6, 5);
 	d1.alloc(5);
-	d1.fill(17.5);
+	d1.fill(17);
 	d1.fillGhost();
 	d1.saveTextFile("testtextfile.txt");
 	d2.loadFile("testtextfile.txt");

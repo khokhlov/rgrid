@@ -13,20 +13,26 @@ namespace rgrid {
 template <typename T, typename I>
 class DArrayContainer {
 public:
-	DArrayContainer();
-	DArrayContainer(const DArray<T, I>& da, const I numParts);
-	DArrayContainer(const DArray<T, I>& da, const I px, const I py, const I pz);
+	DArrayContainer() {}
+	DArrayContainer(const DArray<T, I>& da, const I numParts) { setDArray(da, numParts); }
+	DArrayContainer(const DArray<T, I>& da, const I px, const I py, const I pz) { setDArray(da, px, py, pz); };
 	
-	~DArrayContainer();
+	~DArrayContainer() {}
 	
-	void setDArray(const DArray<T, I>& da, const I numParts);
+	void setDArray(const DArray<T, I>& da, const I numParts); 
 	void setDArray(const DArray<T, I>& da, const I px, const I py, const I pz);
 	
 	// get entire DArray
 	DArray<T, I> getDArray() const;
 	// get specific part of DArray
-	DArray<T, I>& getDArrayPart(const I partNum);
-	DArray<T, I>& getDArrayPart(const I px, I py, I pz);
+	DArray<T, I>& getDArrayPart(const I partNum) {
+		RG_ASSERT(dArray.size() > partNum, "Out of range");
+		return dArray[partNum];
+	}
+	
+	DArray<T, I>& getDArrayPart(const I px, I py, I pz) {
+		return getDArrayPart(pz * parts[X] * parts[Y] + py * parts[X] + px);
+	}
 	
 	I numParts() const { return dArray.size(); }
 	// synchronize ghost nodes
@@ -40,7 +46,7 @@ private:
 	DArrayContainer(const DArrayContainer<T, I>& rhs);
 	DArrayContainer& operator=(const DArrayContainer<T, I>& rhs);
 	
-	I px, py, pz;
+	I parts[ALL_DIRS];
 	std::vector<DArray<T, I> > dArray;
 };
 
