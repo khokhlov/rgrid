@@ -11,7 +11,11 @@ void DArrayContainer<T, I>::setDArray(const DArray<T, I>& da, const I numParts) 
 
 template <typename T, typename I>
 void DArrayContainer<T, I>::setDArray(const DArray<T, I>& da, const I px, const I py, const I pz) {
-	I ls[ALL_DIRS] = { da.localSize(X), da.localSize(Y), da.localSize(Z) };
+	for (I d = X; d != ALL_DIRS; ++d) {
+		ls[d] = da.localSize(d);
+		ml[d] = ls[d] / parts[d];
+		iml[d] = ls[d] % parts[d];
+	}
 	RG_ASSERT(ls[X] >= px || ls[Y] >= py || ls[Z] >= pz, "Not enough nodes to split in this way");
 	dArray.resize(px * py * pz);
 	parts[X] = px;
@@ -19,9 +23,6 @@ void DArrayContainer<T, I>::setDArray(const DArray<T, I>& da, const I px, const 
 	parts[Z] = pz;
 	
 	I nc = da.getNC();
-	
-	I ml[ALL_DIRS] = { ls[X] / px, ls[Y] / py, ls[Z] / pz };
-	I iml[ALL_DIRS] = { ls[X] % px, ls[Y] % py, ls[Z] % pz };
 	
 	for (I k = 0; k != pz; ++k)
 	for (I j = 0; j != py; ++j)
@@ -54,21 +55,51 @@ void DArrayContainer<T, I>::setDArray(const DArray<T, I>& da, const I px, const 
 }
 	
 template <typename T, typename I>
-DArray<T, I> DArrayContainer<T, I>::getDArray() const {
-	// TODO
-	RG_ASSERT(0, "Not implemented");
+void DArrayContainer<T, I>::getDArray(DArray<T, I>& da) const {
+	da.resize(
+		dArray[0].size(X), dArray[0].size(Y), dArray[0].size(Z),
+		ls[X], ls[Y], ls[Z],
+		dArray[0].origin(X), dArray[0].origin(Y), dArray[0].origin(Z),
+		dArray[0].ghost(X), dArray[0].ghost(Y), dArray[0].ghost(Z));
+	I nc = dArray[0].da.getNC();
+	da.alloc(nc);
+	for (I k = 0; k != parts[Z]; ++k)
+	for (I j = 0; j != parts[Y]; ++j)
+	for (I i = 0; i != parts[X]; ++i) {
+		I ind = k * parts[X] * parts[Y] + j * parts[X] + i;
+		for (I cn = 0; cn != nc; ++cn)
+		for (I k2 = 0; k2 != dArray[ind].localSize[Z]; ++k2)
+		for (I j2 = 0; j2 != dArray[ind].localSize[Y]; ++j2)
+		for (I i2 = 0; i2 != dArray[ind].localSize[X]; ++i2) {
+			I orig[ALL_DIRS] = { 
+				dArray[ind].origin(X) - da.origin(X),
+				dArray[ind].origin(Y) - da.origin(Y),
+				dArray[ind].origin(Z) - da.origin(Z)};
+			da(orig[X] + i2, orig[Y] + j2, orig[Z] + k2) = dArray[ind](i2, j2, k2, cn);
+		}
+	}
+	
 }
 
 template <typename T, typename I>
 void DArrayContainer<T, I>::synchronize() {
-	// TODO
-	RG_ASSERT(0, "Not implemented");
-	/*for (I k = 0; k != parts[Z]; ++k)
+	for (I k = 0; k != parts[Z]; ++k)
 	for (I j = 0; j != parts[Y]; ++j)
 	for (I i = 0; i != parts[X]; ++i) {
-		I ind = k * parts[X] * parts[Y] + j * parts[X] + i;
-		dArray[ind].copyGhost(dArray[ind]);
-	}*/
+		DArray<T, I>& da = getDArrayPart(i, j, k);
+		if (i != 0) 
+			(*this)(i, j, k).copyGhost((*this)(i-1, j, k), X, SIDE_LEFT);
+		if (i != parts[X]-1) 
+			(*this)(i, j, k).copyGhost((*this)(i+1, j, k), X, SIDE_RIGHT);
+		if (j != 0) 
+			(*this)(i, j, k).copyGhost((*this)(i, j-1, k), Y, SIDE_LEFT);
+		if (j != parts[Y]-1) 
+			(*this)(i, j, k).copyGhost((*this)(i, j+1, k), Y, SIDE_RIGHT);
+		if (k != 0) 
+			(*this)(i, j, k).copyGhost((*this)(i, j, k-1), Z, SIDE_LEFT);
+		if (k != parts[Z]-1) 
+			(*this)(i, j, k).copyGhost((*this)(i, j, k+1), Z, SIDE_RIGHT);
+	}
 }
 
 #ifdef USE_OPENCL
