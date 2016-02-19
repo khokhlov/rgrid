@@ -82,11 +82,19 @@ void DArrayContainer<T, I>::getDArray(DArray<T, I>& da) const {
 }
 
 template <typename T, typename I>
+void DArrayContainer<T, I>::writeLine(std::basic_iostream<char>& stream, I y, I z, rgio::format fmt) const {
+	I pn[ALL_DIRS] = { 0, locatePart(y), locatePart(z) };
+	I idx[ALL_DIRS] = { 0, locateIndex(y), locateIndex(z) };
+	for (pn[X] = 0; pn[X] != parts[X]; ++pn[X]) {
+		getDArrayPart(pn[X], pn[Y], pn[Z]).writeLine(stream, idx[Y], idx[Z], fmt);
+	}
+}
+
+template <typename T, typename I>
 void DArrayContainer<T, I>::synchronize() {
 	for (I k = 0; k != parts[Z]; ++k)
 	for (I j = 0; j != parts[Y]; ++j)
 	for (I i = 0; i != parts[X]; ++i) {
-		DArray<T, I>& da = getDArrayPart(i, j, k);
 		if (i != 0) 
 			(*this)(i, j, k).copyGhost((*this)(i-1, j, k), X, SIDE_LEFT);
 		if (i != parts[X]-1) 
@@ -105,8 +113,22 @@ void DArrayContainer<T, I>::synchronize() {
 #ifdef USE_OPENCL
 template <typename T, typename I>
 void DArrayContainer<T, I>::clDeviceSynchronize() {
-	// TODO
-	RG_ASSERT(0, "Not implemented");
+	for (I k = 0; k != parts[Z]; ++k)
+	for (I j = 0; j != parts[Y]; ++j)
+	for (I i = 0; i != parts[X]; ++i) {
+		if (i != 0) 
+			(*this)(i, j, k).clCopyGhost((*this)(i-1, j, k), X, SIDE_LEFT);
+		if (i != parts[X]-1) 
+			(*this)(i, j, k).clCopyGhost((*this)(i+1, j, k), X, SIDE_RIGHT);
+		if (j != 0) 
+			(*this)(i, j, k).clCopyGhost((*this)(i, j-1, k), Y, SIDE_LEFT);
+		if (j != parts[Y]-1) 
+			(*this)(i, j, k).clCopyGhost((*this)(i, j+1, k), Y, SIDE_RIGHT);
+		if (k != 0) 
+			(*this)(i, j, k).clCopyGhost((*this)(i, j, k-1), Z, SIDE_LEFT);
+		if (k != parts[Z]-1) 
+			(*this)(i, j, k).clCopyGhost((*this)(i, j, k+1), Z, SIDE_RIGHT);
+	}
 }
 #endif // USE_OPENCL
 

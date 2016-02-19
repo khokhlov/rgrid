@@ -27,6 +27,13 @@ enum CartDim {
 	DIM_3D,
 	DIM_ALL
 };
+
+namespace rgio {
+	
+enum format { BINARY, TEXT };
+
+} // namespace rgio
+
 } // rgrid
 
 #endif // RGRID_TYPES_H

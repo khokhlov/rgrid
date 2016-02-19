@@ -29,20 +29,55 @@ public:
 		RG_ASSERT(dArray.size() > partNum, "Out of range");
 		return dArray[partNum];
 	}
-	DArray<T, I>& getDArrayPart(const I& i, const I& j, const I& k) {
+	DArray<T, I>& getDArrayPart(const I i, const I j, const I k) {
 		I ind = k * parts[X] * parts[Y] + j * parts[X] + i;
 		return dArray[ind];
 	}
 	
-	DArray<T, I>& getDArrayPart(const I px, I py, I pz) {
-		return getDArrayPart(pz * parts[X] * parts[Y] + py * parts[X] + px);
-	}
-	
-	DArray<T, I>& operator()(const I px, I py, I pz) {
+	DArray<T, I>& operator()(const I px, const I py, const I pz) {
 		return getDArrayPart(px, py, pz);
 	}
 	
 	I numParts() const { return dArray.size(); }
+	I numParts(CartDir dir) const { return parts[dir]; }
+	
+	// num nodes of entire dArray
+	I size() const { return ls[X] * ls[Y] * ls[Z]; }
+	// num nodes of entire dArray in direction dir
+	I size(CartDir dir) const { return ls[dir]; }
+	
+	// write line (all nodes on X direction) with coordinates y and z into stream
+	void writeLine(std::basic_iostream<char>& stream, I y, I z, rgio::format fmt) const;
+	
+	// find index in part of darrays
+	// dir - direction of indexes and parts
+	// contIdx - index of node in container
+	inline I locateIndex(const CartDir dir, const I contIdx) {
+		if (contIdx < iml[dir] * (ml[dir] + 1)) { 
+			return contIdx % (ml[dir] + 1);
+		} else {
+			return ml[dir] - 1 - ((ls[dir] - 1 - contIdx) % ml[dir]);
+		}
+	}
+	
+	// find what part contains this node
+	// dir - direction of parts
+	// contIdx - index of node in container
+	inline I locatePart(const CartDir dir, const I contIdx) {
+		if (contIdx < iml[dir] * (ml[dir] + 1)) { 
+			return contIdx / (ml[dir] + 1);
+		} else {
+			return parts[dir] - 1 - ((ls[dir] - 1 - contIdx) / ml[dir]);
+		}
+	}
+	
+	// return node in position (i, j, k) and number cn
+	inline T& getNode(const I i, const I j, const I k, const I cn) {
+		I pn[ALL_DIRS] = { locatePart(i), locatePart(j), locatePart(k) };
+		I idx[ALL_DIRS] = { locateIndex(i), locateIndex(j), locateIndex(k) };
+		return getDArrayPart(pn[X], pn[Y], pn[Z]).val(idx[X], idx[Y], idx[Z], cn);
+	}
+	
 	// synchronize ghost nodes
 	void synchronize();
 #ifdef USE_OPENCL

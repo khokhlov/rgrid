@@ -50,16 +50,19 @@ class DArray : public PDim<I> {
 		T &val(const I i, const I cn) { return val(i, static_cast<T>(0), cn); }
 		T &val(const I &i1, const CartDir &d1, const I &i2, const CartDir &d2, const I &i3, const CartDir &d3, const I cn) { return data[this->ind(i1, d1, i2, d2, i3, d3) + cn * this->localSizeGhost()]; }
 
-		T &operator()(const I& i, const I& j, const I& k, const I& cn) { return val(i, j, k, cn); }
-		T &operator()(const I& i, const I& j, const I& cn) { return (*this)(i, j, static_cast<I>(0), cn); }
-		T &operator()(const I& i, const I& cn) { return (*this)(i, static_cast<I>(0), cn); }
+		T &operator()(const I i, const I j, const I k, const I cn) { return val(i, j, k, cn); }
+		T &operator()(const I i, const I j, const I cn) { return (*this)(i, j, static_cast<I>(0), cn); }
+		T &operator()(const I i, const I cn) { return (*this)(i, static_cast<I>(0), cn); }
 
-		const T &operator()(const I& i, const I& j, const I& k, const I& cn) const { return data[PDim<I>::ind(i, j, k) + cn * PDim<I>::localSizeGhost()]; }
-		const T &operator()(const I& i, const I& j, const I& cn) const { return (*this)(i, j, static_cast<I>(0), cn); }
-		const T &operator()(const I& i, const I& cn) const { return (*this)(i, static_cast<I>(0), cn); }
+		const T &operator()(const I i, const I j, const I k, const I cn) const { return data[PDim<I>::ind(i, j, k) + cn * PDim<I>::localSizeGhost()]; }
+		const T &operator()(const I i, const I j, const I cn) const { return (*this)(i, j, static_cast<I>(0), cn); }
+		const T &operator()(const I i, const I cn) const { return (*this)(i, static_cast<I>(0), cn); }
 		
 		// get number of components
 		I getNC() const { return nc; };
+		
+		// write line (all nodes on X direction) with coordinates y and z into stream
+		void writeLine(std::basic_iostream<char>& stream, I y, I z, rgio::format fmt) const;
 		
 		// save darray to file named "name" in binary format
 		void saveBinaryFile(const char* name);
@@ -72,6 +75,9 @@ class DArray : public PDim<I> {
 		void loadFileHeader(std::ifstream& f);
 #ifdef USE_OPENCL
 	public:
+		// the same as copy ghost, but it make copy on device
+		void clCopyGhost(DArray<T, I>& da, const CartDir &d, const CartSide &s);
+		
 		/* Set OpenCL context to work with buffer */
 		void setCLContext(cl_context context);
 		
@@ -175,6 +181,21 @@ void DArray<T, I>::fillGhost(const CartDir &d, const CartSide &s)
 				for (I gs = 1; gs <= this->ghost(d); gs++) {
 					this->val(i, ort1, j, ort2, k - sign * gs, d, cn) = this->val(i, ort1, j, ort2, k, d, cn);
 				}
+			}
+		}
+	}
+}
+
+template <typename T, typename I>
+void DArray<T, I>::writeLine(std::basic_iostream<char>& stream, I y, I z, rgio::format fmt) const {
+	for (I x = 0; x != PDim<I>::localSize(X); ++x) {
+		for (I cn = 0; cn != nc; ++cn) {
+			if (fmt == rgio::TEXT)
+				stream << operator()(x, y, z, cn);
+			else if (fmt == rgio::BINARY) {
+				T d = operator()(x, y, z, cn);
+				const char *dc = (const char*)(&d);
+				stream.write(dc, sizeof(T));
 			}
 		}
 	}
@@ -362,6 +383,12 @@ void DArray<T, I>::clDtoH() {
 		CHECK_CL_ERROR(clEnqueueReadBuffer(clCQ, clBuffer, CL_TRUE, 0, data.size() * sizeof(T), &(data[0]), 0, NULL, NULL));
 		clOnDevice = false;
 	}
+}
+
+template <typename T, typename I>
+void DArray<T, I>::clCopyGhost(DArray<T, I>& da, const CartDir &d, const CartSide &s) {
+	// TODO
+	RG_ASSERT(0, "not implemented");
 }
 
 #endif // USE_OPENCL
