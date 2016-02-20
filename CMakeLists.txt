@@ -25,6 +25,12 @@ add_library(rgrid SHARED ${RGRID})
 add_executable(test_darray tests/test_darray.cpp)
 target_link_libraries(test_darray rgrid ${EXTRA_LIBS})
 
+add_executable(test_rgio tests/test_rgio.cpp)
+target_link_libraries(test_rgio rgrid ${EXTRA_LIBS})
+
+add_executable(test_darraycontainer tests/test_darraycontainer.cpp)
+target_link_libraries(test_darraycontainer rgrid ${EXTRA_LIBS})
+
 add_executable(test_pdim tests/test_pdim.cpp)
 target_link_libraries(test_pdim rgrid ${EXTRA_LIBS})
 

@@ -62,7 +62,10 @@ class DArray : public PDim<I> {
 		I getNC() const { return nc; };
 		
 		// write line (all nodes on X direction) with coordinates y and z into stream
-		void writeLine(std::basic_iostream<char>& stream, I y, I z, rgio::format fmt) const;
+		void writeLine(std::iostream& stream, I y, I z, rgio::format fmt) const;
+		
+		// write line (all nodes on X direction) with coordinates y and z into stream
+		void readLine(std::iostream& stream, I y, I z, rgio::format fmt);
 		
 		// save darray to file named "name" in binary format
 		void saveBinaryFile(const char* name);
@@ -187,15 +190,31 @@ void DArray<T, I>::fillGhost(const CartDir &d, const CartSide &s)
 }
 
 template <typename T, typename I>
-void DArray<T, I>::writeLine(std::basic_iostream<char>& stream, I y, I z, rgio::format fmt) const {
+void DArray<T, I>::writeLine(std::iostream& stream, I y, I z, rgio::format fmt) const {
 	for (I x = 0; x != PDim<I>::localSize(X); ++x) {
 		for (I cn = 0; cn != nc; ++cn) {
-			if (fmt == rgio::TEXT)
-				stream << operator()(x, y, z, cn);
-			else if (fmt == rgio::BINARY) {
+			if (fmt == rgio::TEXT) {
+				stream << operator()(x, y, z, cn) << " ";
+			} else if (fmt == rgio::BINARY) {
 				T d = operator()(x, y, z, cn);
 				const char *dc = (const char*)(&d);
 				stream.write(dc, sizeof(T));
+			}
+		}
+	}
+}
+
+template <typename T, typename I>
+void DArray<T, I>::readLine(std::iostream& stream, I y, I z, rgio::format fmt) {
+	for (I x = 0; x != PDim<I>::localSize(X); ++x) {
+		for (I cn = 0; cn != nc; ++cn) {
+			if (fmt == rgio::TEXT) {
+				stream >> operator()(x, y, z, cn);
+			} else if (fmt == rgio::BINARY) {
+				T d;
+				char *dc = (char*)(&d);
+				stream.read(dc, sizeof(T));
+				operator()(x, y, z, cn) = d;
 			}
 		}
 	}
