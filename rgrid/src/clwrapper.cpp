@@ -33,14 +33,15 @@ namespace clwrapper {
 
 CLWrapper::CLWrapper()
 {
-	platforms.resize(getPNum());
-	CHECK_CL_ERROR(clGetPlatformIDs(platforms.size(), &(platforms[0]), NULL));
+	platformsNum = getPNum();
+	platforms.resize(platformsNum);
+	CHECK_CL_ERROR(clGetPlatformIDs(platformsNum, &(platforms[0]), NULL));
 	
-	devicesNum.resize(platforms.size());
-	devices.resize(platforms.size());
-	context.resize(platforms.size());
-	cq.resize(platforms.size());
-	for (unsigned i = 0; i != platforms.size(); ++i) {
+	devicesNum.resize(platformsNum);
+	devices.resize(platformsNum);
+	context.resize(platformsNum);
+	cq.resize(platformsNum);
+	for (unsigned i = 0; i != platformsNum; ++i) {
 		cl_int errCode;
 		// get devices for specified platform
 		devicesNum[i] = getDNum(platforms[i]);
@@ -65,6 +66,16 @@ CLWrapper::CLWrapper()
 	}	
 }
 
+CLWrapper::~CLWrapper() {
+	RG_ASSERT(context.size() == cq.size(), "Context and command queue sizes must be the same");
+	for (unsigned i = 0; i != context.size(); ++i) {
+		CHECK_CL_ERROR(clReleaseContext(context[i]));
+		for (unsigned j = 0; j != cq[i].size(); ++j) {
+			CHECK_CL_ERROR(clReleaseCommandQueue(cq[i][j]));
+		}
+	}
+}
+
 const cl_context& CLWrapper::getContext(unsigned platformNum) const
 {
 	RG_ASSERT(platformNum < context.size(), "Wrong platform number");
@@ -76,6 +87,13 @@ const cl_command_queue& CLWrapper::getCommandQueue(unsigned int deviceNum, unsig
 	RG_ASSERT(contextNum < cq.size(), "Wrong context number");
 	RG_ASSERT(deviceNum < cq[contextNum].size(), "Wrong device number");
 	return cq[contextNum][deviceNum];
+}
+
+const cl_device_id& CLWrapper::getDevice(unsigned deviceNum, unsigned platformNum) const
+{
+	RG_ASSERT(platformNum < devices.size(), "Wrong context number");
+	RG_ASSERT(deviceNum < devices[platformNum].size(), "Wrong device number");
+	return devices[platformNum][deviceNum];
 }
 
 unsigned int CLWrapper::getDevicesNum(unsigned int platform) const

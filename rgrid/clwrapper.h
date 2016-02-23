@@ -31,6 +31,9 @@ public:
 	// return command queue for specific context (the same as platform number) and device
 	const cl_command_queue& getCommandQueue (unsigned deviceNum = 0, unsigned contextNum = 0) const;
 	
+	// return device for specific platform
+	const cl_device_id& getDevice(unsigned deviceNum = 0, unsigned platformNum = 0) const;
+		
 	// return number of platforms
 	unsigned getPlatformsNum() const { return platformsNum; }
 	
@@ -43,6 +46,7 @@ private:
 	CLWrapper();	
 	CLWrapper(const CLWrapper&);
 	CLWrapper& operator=(const CLWrapper&);
+	~CLWrapper();
 	
 	unsigned platformsNum;
 	std::vector<unsigned> devicesNum;

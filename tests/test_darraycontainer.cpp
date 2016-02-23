@@ -18,8 +18,11 @@ TEST_CASE(
 	d1(3, 3, 3, 0) = 7;
 	d1(3, 3, 3, 1) = 8;
 	d1.fillGhost();
-	std::stringstream ss1, ss2;
 	rgrid::DArrayContainer<int, int> dac(d1, 13, 2, 7);
 	dac.getDArray(d2);
+	REQUIRE(d1 == d2);
+	dac.getNode(35, 50, 51, 2) = 777;
+	dac.getDArray(d2);
+	d1(35, 50, 51, 2) = 777;
 	REQUIRE(d1 == d2);
 }

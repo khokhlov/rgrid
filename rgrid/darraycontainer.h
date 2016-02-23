@@ -26,12 +26,19 @@ public:
 	void getDArray(DArray<T, I>&) const;
 	// get specific part of DArray
 	DArray<T, I>& getDArrayPart(const I partNum) {
-		RG_ASSERT(dArray.size() > partNum, "Out of range");
+		RG_ASSERT(dArray.size() > static_cast<size_t>(partNum), "Out of range");
+		return dArray[partNum];
+	}
+	const DArray<T, I>& getDArrayPart(const I partNum) const {
+		RG_ASSERT(dArray.size() > static_cast<size_t>(partNum), "Out of range");
 		return dArray[partNum];
 	}
 	DArray<T, I>& getDArrayPart(const I i, const I j, const I k) {
-		I ind = k * parts[X] * parts[Y] + j * parts[X] + i;
-		return dArray[ind];
+		return dArray[ind(i, j, k)];
+	}
+	
+	I const ind(const I i, const I j, const I k) const {
+		return k * parts[X] * parts[Y] + j * parts[X] + i;
 	}
 	
 	DArray<T, I>& operator()(const I px, const I py, const I pz) {
@@ -52,7 +59,7 @@ public:
 	// find index in part of darrays
 	// dir - direction of indexes and parts
 	// contIdx - index of node in container
-	inline I locateIndex(const CartDir dir, const I contIdx) {
+	inline I locateIndex(const CartDir dir, const I contIdx) const {
 		if (contIdx < iml[dir] * (ml[dir] + 1)) { 
 			return contIdx % (ml[dir] + 1);
 		} else {
@@ -63,7 +70,7 @@ public:
 	// find what part contains this node
 	// dir - direction of parts
 	// contIdx - index of node in container
-	inline I locatePart(const CartDir dir, const I contIdx) {
+	inline I locatePart(const CartDir dir, const I contIdx) const {
 		if (contIdx < iml[dir] * (ml[dir] + 1)) { 
 			return contIdx / (ml[dir] + 1);
 		} else {
@@ -73,8 +80,8 @@ public:
 	
 	// return node in position (i, j, k) and number cn
 	inline T& getNode(const I i, const I j, const I k, const I cn) {
-		I pn[ALL_DIRS] = { locatePart(i), locatePart(j), locatePart(k) };
-		I idx[ALL_DIRS] = { locateIndex(i), locateIndex(j), locateIndex(k) };
+		I pn[ALL_DIRS] = { locatePart(X, i), locatePart(Y, j), locatePart(Z, k) };
+		I idx[ALL_DIRS] = { locateIndex(X, i), locateIndex(Y, j), locateIndex(Z, k) };
 		return getDArrayPart(pn[X], pn[Y], pn[Z]).val(idx[X], idx[Y], idx[Z], cn);
 	}
 	
@@ -167,16 +174,16 @@ void DArrayContainer<T, I>::getDArray(DArray<T, I>& da) const {
 	for (I k = 0; k != parts[Z]; ++k)
 	for (I j = 0; j != parts[Y]; ++j)
 	for (I i = 0; i != parts[X]; ++i) {
-		I ind = k * parts[X] * parts[Y] + j * parts[X] + i;
+		I idx = ind(i, j, k);
 		for (I cn = 0; cn != nc; ++cn)
-		for (I k2 = 0; k2 != dArray[ind].localSize(Z); ++k2)
-		for (I j2 = 0; j2 != dArray[ind].localSize(Y); ++j2)
-		for (I i2 = 0; i2 != dArray[ind].localSize(X); ++i2) {
+		for (I k2 = 0; k2 != dArray[idx].localSize(Z); ++k2)
+		for (I j2 = 0; j2 != dArray[idx].localSize(Y); ++j2)
+		for (I i2 = 0; i2 != dArray[idx].localSize(X); ++i2) {
 			I orig[ALL_DIRS] = { 
-				dArray[ind].origin(X) - da.origin(X),
-				dArray[ind].origin(Y) - da.origin(Y),
-				dArray[ind].origin(Z) - da.origin(Z)};
-			da(orig[X] + i2, orig[Y] + j2, orig[Z] + k2, cn) = dArray[ind](i2, j2, k2, cn);
+				dArray[idx].origin(X) - da.origin(X),
+				dArray[idx].origin(Y) - da.origin(Y),
+				dArray[idx].origin(Z) - da.origin(Z)};
+			da(orig[X] + i2, orig[Y] + j2, orig[Z] + k2, cn) = dArray[idx](i2, j2, k2, cn);
 		}
 	}
 	
@@ -184,10 +191,10 @@ void DArrayContainer<T, I>::getDArray(DArray<T, I>& da) const {
 
 template <typename T, typename I>
 void DArrayContainer<T, I>::writeLine(std::basic_iostream<char>& stream, I y, I z, rgio::format fmt) const {
-	I pn[ALL_DIRS] = { 0, locatePart(y), locatePart(z) };
-	I idx[ALL_DIRS] = { 0, locateIndex(y), locateIndex(z) };
+	I pn[ALL_DIRS] = { 0, locatePart(Y, y), locatePart(Z, z) };
+	I idx[ALL_DIRS] = { 0, locateIndex(Y, y), locateIndex(Z, z) };
 	for (pn[X] = 0; pn[X] != parts[X]; ++pn[X]) {
-		getDArrayPart(pn[X], pn[Y], pn[Z]).writeLine(stream, idx[Y], idx[Z], fmt);
+		dArray[ind(pn[X], pn[Y], pn[Z])].writeLine(stream, idx[Y], idx[Z], fmt);
 	}
 }
 

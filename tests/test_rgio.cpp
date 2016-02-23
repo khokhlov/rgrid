@@ -53,3 +53,22 @@ TEST_CASE(
 	fs.close();
 	REQUIRE(d1 == d3);
 }
+
+TEST_CASE(
+		"rgio",
+		"DArrayContainerInString"
+	 )
+{
+	rgrid::DArray<int, int> d1, d2;
+	d1.resize(5, 10, 12);
+	d1.alloc(3);
+	d1.fill(17);
+	d1(4, 7, 0, 0) = 4;
+	d1(4, 5, 0, 2) = 5;
+	d1.fillGhost();
+	rgrid::DArrayContainer<int, int> dac(d1, 2, 3, 3);
+	std::stringstream ss;
+	rgrid::rgio::saveData(ss, dac, rgrid::rgio::BINARY);
+	rgrid::rgio::loadData(ss, d2);
+	REQUIRE(d1 == d2);
+}

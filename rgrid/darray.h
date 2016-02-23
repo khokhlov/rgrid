@@ -28,6 +28,8 @@ class DArray : public PDim<I> {
 			clOnDevice(false), 
 #endif
 			nc(1) {}
+			
+		~DArray();
 		
 		void alloc() { alloc(static_cast<I>(1)); }
 		void alloc(const I &nc);
@@ -58,6 +60,8 @@ class DArray : public PDim<I> {
 		const T &operator()(const I i, const I j, const I cn) const { return (*this)(i, j, static_cast<I>(0), cn); }
 		const T &operator()(const I i, const I cn) const { return (*this)(i, static_cast<I>(0), cn); }
 		
+		I dataSize() const { return data.size(); }
+		
 		// get number of components
 		I getNC() const { return nc; };
 		
@@ -87,9 +91,17 @@ class DArray : public PDim<I> {
 		/* Set OpenCL command queue */
 		void setCLCQ(cl_command_queue cq);
 		
-		/* Get OpenCL data buffer to work in kernels. 
+		/* Get OpenCL data buffer to work in kernels
+		 * clHtoD() and clDtoH() uses this buffer 
 		 * You must run setCLContext() and setCLCQ() before */
 		cl_mem &getCLBuffer();
+		
+		/* Get second temporary buffer with the same size as first buffer to improve performance
+		 * You must run setCLContext() and setCLCQ() before */
+		cl_mem &getCLBuffer2();
+		
+		/* swap first and second buffers */
+		void swapCLBuffers() { std::swap(clBuffer, clBuffer2); }
 		
 		/* copy data from host to device */
 		void clHtoD();
@@ -99,6 +111,7 @@ class DArray : public PDim<I> {
 		
 	private:
 		void clInitBuffer();
+		void clReleaseBuffer();
 		
 		/* OpenCL context to work with buffer */
 		cl_context clContext;
@@ -107,7 +120,7 @@ class DArray : public PDim<I> {
 		cl_command_queue clCQ;
 		
 		/* Data array on device */
-		cl_mem clBuffer;
+		cl_mem clBuffer, clBuffer2;
 		
 		bool clContextIsSet;
 		bool clCQIsSet;
@@ -116,13 +129,20 @@ class DArray : public PDim<I> {
 		/* true - data on device, false - data on host */
 		bool clOnDevice;
 #endif		
-	public:	
+	private:	
 		/* Data. */
 		std::vector<T> data;
 
 		/* Number of components. */
 		I nc;
 }; // DArray
+
+template <typename T, typename I>
+DArray<T, I>::~DArray() {
+#ifdef USE_OPENCL
+	clReleaseBuffer();
+#endif
+}
 
 template <typename T, typename I>
 void DArray<T, I>::alloc(const I &nc)
@@ -342,13 +362,15 @@ template <typename T, typename I>
 bool operator==(const DArray<T, I>& lhs, const DArray<T, I>& rhs) {
 	if (&lhs == &rhs) return true;
 	if (static_cast<PDim<I> >(lhs) != static_cast<PDim<I> >(rhs)) return false;
-	if (lhs.nc != rhs.nc) return false;
+	if (lhs.getNC() != rhs.getNC()) return false;
 	// don't check ghost!
-	for (I c = 0; c != lhs.nc; ++c)
+	for (I c = 0; c != lhs.getNC(); ++c)
 	for (I k = 0; k != lhs.localSize(Z); ++k)
 	for (I j = 0; j != lhs.localSize(Y); ++j)
 	for (I i = 0; i != lhs.localSize(X); ++i) {
-		if (lhs(i, j, k, c) != rhs(i, j, k, c)) return false;
+		if (lhs(i, j, k, c) != rhs(i, j, k, c)) {
+			return false;
+		}
 	}
 	return true;
 }
@@ -359,30 +381,47 @@ template <typename T, typename I>
 void DArray<T, I>::setCLContext(cl_context context) {
 	this->clContext = context;
 	clContextIsSet = true;
-	clBufInitialized = false;
+	clReleaseBuffer();
 }
 
 template <typename T, typename I>
 void DArray<T, I>::setCLCQ(cl_command_queue cq) {
 	this->clCQ = cq;
 	clCQIsSet = true;
-	clBufInitialized = false;
+	clReleaseBuffer();
 }
 
 template <typename T, typename I>
 void DArray<T, I>::clInitBuffer() {
 	RG_ASSERT(clContextIsSet, "Call setCLContext() first");
 	RG_ASSERT(clCQIsSet, "Call setCLCQ() first");
-	cl_int err_code;
-	this->clBuffer = clCreateBuffer(this->clContext, CL_MEM_READ_WRITE, data.size() * sizeof(T), NULL, &err_code);
-	CHECK_CL_ERROR(err_code);
+	cl_int err;
+	this->clBuffer = clCreateBuffer(this->clContext, CL_MEM_READ_WRITE, data.size() * sizeof(T), NULL, &err);
+	CHECK_CL_ERROR(err);
+	this->clBuffer2 = clCreateBuffer(this->clContext, CL_MEM_READ_WRITE, data.size() * sizeof(T), NULL, &err);
+	CHECK_CL_ERROR(err);
 	clBufInitialized = true;
+}
+
+template <typename T, typename I>
+void DArray<T, I>::clReleaseBuffer() {
+	if (clBufInitialized) {
+		clReleaseMemObject(clBuffer);
+		clReleaseMemObject(clBuffer2);
+		clBufInitialized = false;
+	}
 }
 
 template <typename T, typename I>
 cl_mem& DArray<T, I>::getCLBuffer() {
 	if (!clBufInitialized) clInitBuffer();
 	return this->clBuffer;
+}
+
+template <typename T, typename I>
+cl_mem& DArray<T, I>::getCLBuffer2() {
+	if (!clBufInitialized) clInitBuffer();
+	return this->clBuffer2;
 }
 
 template <typename T, typename I>

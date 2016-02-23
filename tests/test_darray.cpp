@@ -18,11 +18,11 @@ TEST_CASE(
 	DArray d;
 	REQUIRE(d.size() == 0);
 	REQUIRE(d.localSize() == 0);
-	REQUIRE(d.data.size() == 0);
+	REQUIRE(d.dataSize() == 0);
 	d.resize(1, 2, 3);
-	REQUIRE((int)d.data.size() != d.localSizeGhost());
+	REQUIRE(d.dataSize() != d.localSizeGhost());
 	d.alloc();
-	REQUIRE((int)d.data.size() == d.localSizeGhost());
+	REQUIRE(d.dataSize() == d.localSizeGhost());
 }
 
 TEST_CASE(
