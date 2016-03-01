@@ -71,19 +71,13 @@ class DArray : public PDim<I> {
 		// write line (all nodes on X direction) with coordinates y and z into stream
 		void readLine(std::iostream& stream, I y, I z, rgio::format fmt);
 		
-		// save darray to file named "name" in binary format
-		void saveBinaryFile(const char* name);
-		// save darray to file named "name" in text format
-		void saveTextFile(const char* name);
-		// load darray from file named "name" in any format
-		void loadFile(const char* name);
-	private:
-		void writeFileHeader(std::ofstream& f);
-		void loadFileHeader(std::ifstream& f);
 #ifdef USE_OPENCL
 	public:
 		// the same as copy ghost, but it make copy on device
-		void clCopyGhost(DArray<T, I>& da, const CartDir &d, const CartSide &s);
+		void copyGhostCL(DArray<T, I>& da, const CartDir &d, const CartSide &s);
+		
+		// the same as fill ghost, but working on device
+		void fillGhostCL(const CartDir &d, const CartSide &s);
 		
 		/* Set OpenCL context to work with buffer */
 		void setCLContext(cl_context context);
@@ -241,124 +235,6 @@ void DArray<T, I>::readLine(std::iostream& stream, I y, I z, rgio::format fmt) {
 }
 
 template <typename T, typename I>
-void DArray<T, I>::saveTextFile(const char* name)
-{
-	std::ofstream f(name);
-	RG_ASSERT(f.is_open(), "Can't open file");
-	// write header
-	writeFileHeader(f);
-	// write data in text format
-	f << "FORMAT: text\n";
-	f << "DATA START\n";
-	for (I c = 0; c != this->nc; ++c)
-	for (I k = 0; k != this->localSize(Z); ++k)
-	for (I j = 0; j != this->localSize(Y); ++j)
-	for (I i = 0; i != this->localSize(X); ++i) {
-		f << (*this)(i, j, k, c) << " ";
-	}
-	f.close();
-}
-
-template <typename T, typename I>
-void DArray<T, I>::saveBinaryFile(const char* name)
-{
-	std::ofstream f(name);
-	RG_ASSERT(f.is_open(), "Can't open file");
-	// write header
-	writeFileHeader(f);
-	// write data in binary format
-	f << "FORMAT: binary\n";
-	f << "DATA START\n";
-	for (I c = 0; c != this->nc; ++c)
-	for (I k = 0; k != this->localSize(Z); ++k)
-	for (I j = 0; j != this->localSize(Y); ++j)
-	for (I i = 0; i != this->localSize(X); ++i) {
-		T d = (*this)(i, j, k, c);
-		const char *dc = reinterpret_cast<const char*>(&d);
-		f.write(dc, sizeof(T));
-	}
-	f.close();
-}
-
-template <typename T, typename I>
-void DArray<T, I>::writeFileHeader(std::ofstream& f)
-{
-	f << "# DARRAY DATA FORMAT\n";
-	f << "SIZE: " << this->localSize(X) << " " << this->localSize(Y) << " " << this->localSize(Z) << "\n";
-	f << "COMPONENTS: " << this->nc << "\n";
-}
-
-template <typename T, typename I>
-void DArray<T, I>::loadFileHeader(std::ifstream& f)
-{
-	// darray params
-	I size[ALL_DIRS];
-	I components;
-	
-	std::string str;
-	
-	std::getline(f, str); 
-	RG_ASSERT(0 == str.compare("# DARRAY DATA FORMAT"), "Wrong file format");
-	
-	std::getline(f, str, ':');	
-	RG_ASSERT(0 == str.compare("SIZE"), "Wrong entry, SIZE expected");
-	f >> size[X] >> size[Y] >> size[Z];
-	std::getline(f, str);
-	
-	std::getline(f, str, ':');
-	RG_ASSERT(0 == str.compare("COMPONENTS"), "Wrong entry, COMPONENTS expected");
-	f >> components;
-	std::getline(f, str);
-
-	PDim<I>::resize(size[X], size[Y], size[Z]);
-	alloc(components);
-}
-
-template <typename T, typename I>
-void DArray<T, I>::loadFile(const char* name)
-{
-	std::ifstream f(name);
-	RG_ASSERT(f.is_open(), "Can't open file");
-	
-	loadFileHeader(f);
-	
-	std::string str;
-	std::getline(f, str, ':');
-	RG_ASSERT(0 == str.compare("FORMAT"), "Wrong entry, FORMAT expected");
-	f >> str;
-	if (0 == str.compare("text")) {
-		// load data in text format
-		std::getline(f, str);
-		std::getline(f, str);
-		RG_ASSERT(0 == str.compare("DATA START"), "Wrong entry, DATA START expected");
-		for (I c = 0; c != this->nc; ++c)
-		for (I k = 0; k != this->localSize(Z); ++k)
-		for (I j = 0; j != this->localSize(Y); ++j)
-		for (I i = 0; i != this->localSize(X); ++i) {
-			f >> (*this)(i, j, k, c);
-		}
-	} else if (0 == str.compare("binary")) {
-		// load data in binary format
-		std::getline(f, str);
-		std::getline(f, str);
-		RG_ASSERT(0 == str.compare("DATA START"), "Wrong entry, DATA START expected");
-		for (I c = 0; c != this->nc; ++c)
-		for (I k = 0; k != this->localSize(Z); ++k)
-		for (I j = 0; j != this->localSize(Y); ++j)
-		for (I i = 0; i != this->localSize(X); ++i) {
-			T d;
-			char *dc = reinterpret_cast<char*>(&d);
-			f.read(dc, sizeof(T));
-			(*this)(i, j, k, c) = d;
-		}
-	} else {
-		RG_ASSERT(0, "Unknown format");
-	}
-	
-	f.close();
-}
-
-template <typename T, typename I>
 bool operator==(const DArray<T, I>& lhs, const DArray<T, I>& rhs) {
 	if (&lhs == &rhs) return true;
 	if (static_cast<PDim<I> >(lhs) != static_cast<PDim<I> >(rhs)) return false;
@@ -444,9 +320,107 @@ void DArray<T, I>::clDtoH() {
 }
 
 template <typename T, typename I>
-void DArray<T, I>::clCopyGhost(DArray<T, I>& da, const CartDir &d, const CartSide &s) {
-	// TODO
-	RG_ASSERT(0, "not implemented");
+void DArray<T, I>::copyGhostCL(DArray<T, I>& da, const CartDir &d, const CartSide &s) {
+	size_t origFrom[ALL_DIRS], origTo[ALL_DIRS];
+	size_t origHost[ALL_DIRS] = { 0, 0, 0 }; 
+	size_t region[ALL_DIRS];
+	CartDir ort1, ort2;
+	ortDirs(d, ort1, ort2);
+	origFrom[ort1] = origTo[ort1] = da.ghost(ort1);
+	origFrom[ort2] = origTo[ort2] = da.ghost(ort2);
+	region[d] = da.ghost(d);
+	region[ort1] = da.localSize(ort1);
+	region[ort2] = da.localSize(ort2);
+	if (s == SIDE_LEFT) {
+		origTo[d] = 0;
+		origFrom[d] = (PDim<I>::localSizeGhost(d) - 2 * PDim<I>::ghost(d));
+	} else {
+		origTo[d] = (PDim<I>::localSizeGhost(d) - PDim<I>::ghost(d));
+		origFrom[d] = da.ghost(d);
+	}
+	I regionSize = region[X] * region[Y] * region[Z];
+	T* hostMem = new T[regionSize * nc];
+	// add sizeof(T) multiplier in X direction
+	origFrom[X] *= sizeof(T);
+	origTo[X] *= sizeof(T);
+	region[X] *= sizeof(T);
+	// Create Sub buffers to work with components separately
+	cl_mem* subBufFrom = new cl_mem[nc];
+	cl_mem* subBufTo = new cl_mem[nc];
+	for (I cn = 0; cn != nc; ++cn) {
+		cl_int err;
+		cl_buffer_region clbr;
+		clbr.size = da.localSizeGhost() * sizeof(T);
+		clbr.origin = clbr.size * cn;
+		subBufFrom[cn] = clCreateSubBuffer(da.clBuffer, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &clbr, &err);
+		CHECK_CL_ERROR(err);
+		clbr.size = PDim<I>::localSizeGhost() * sizeof(T);
+		clbr.origin = clbr.size * cn;
+		subBufTo[cn] = clCreateSubBuffer(clBuffer, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &clbr, &err);
+		CHECK_CL_ERROR(err);
+	}
+	// TODO make non blocking copy
+	for (I cn = 0; cn != nc; ++cn) {
+		CHECK_CL_ERROR(clEnqueueReadBufferRect(da.clCQ, subBufFrom[cn], CL_TRUE, origFrom, origHost, region, da.stride(Y) * sizeof(T), da.stride(Z) * sizeof(T), region[X], region[X] * region[Y], hostMem + regionSize * cn, 0, NULL, NULL));
+	}
+	for (I cn = 0; cn != nc; ++cn) {
+		CHECK_CL_ERROR(clEnqueueWriteBufferRect(clCQ, subBufTo[cn], CL_TRUE, origTo, origHost, region, PDim<I>::stride(Y) * sizeof(T), PDim<I>::stride(Z) * sizeof(T), region[X], region[X] * region[Y], hostMem + regionSize * cn, 0, NULL, NULL));
+	}
+	for (I cn = 0; cn != nc; ++cn) {
+		CHECK_CL_ERROR(clReleaseMemObject(subBufFrom[cn]));
+		CHECK_CL_ERROR(clReleaseMemObject(subBufTo[cn]));
+	}
+	delete[] subBufTo;
+	delete[] subBufFrom;
+	delete[] hostMem;
+}
+
+template <typename T, typename I>
+void DArray<T, I>::fillGhostCL(const CartDir &d, const CartSide &s) {
+	size_t origFrom[ALL_DIRS], origTo[ALL_DIRS];
+	size_t region[ALL_DIRS];
+	CartDir ort1, ort2;
+	ortDirs(d, ort1, ort2);
+	origFrom[ort1] = origTo[ort1] = PDim<I>::ghost(ort1);
+	origFrom[ort2] = origTo[ort2] = PDim<I>::ghost(ort2);
+	region[d] = 1;
+	region[ort1] = PDim<I>::localSize(ort1);
+	region[ort2] = PDim<I>::localSize(ort2);
+	if (s == SIDE_LEFT) {
+		origTo[d] = 0;
+		origFrom[d] = PDim<I>::ghost(d);
+	} else {
+		origTo[d] = (PDim<I>::localSizeGhost(d) - PDim<I>::ghost(d));
+		origFrom[d] = (PDim<I>::localSizeGhost(d) - PDim<I>::ghost(d) - 1);
+	}
+	// add sizeof(T) multiplier in X direction
+	origFrom[X] *= sizeof(T);
+	origTo[X] *= sizeof(T);
+	region[X] *= sizeof(T);
+	// Create Sub buffers to work with components separately
+	cl_mem* subBuf = new cl_mem[nc];
+	for (I cn = 0; cn != nc; ++cn) {
+		cl_int err;
+		cl_buffer_region clbr;
+		clbr.size = PDim<I>::localSizeGhost() * sizeof(T);
+		clbr.origin = clbr.size * cn;
+		subBuf[cn] = clCreateSubBuffer(clBuffer, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &clbr, &err);
+		CHECK_CL_ERROR(err);
+	}
+	// TODO make non blocking copy
+	for (I gh = 0; gh != PDim<I>::ghost(d); ++gh) {
+		for (I cn = 0; cn != nc; ++cn) {
+			cl_event event;
+			CHECK_CL_ERROR(clEnqueueCopyBufferRect(clCQ, subBuf[cn], subBuf[cn], origFrom, origTo, region, PDim<I>::stride(Y) * sizeof(T), PDim<I>::stride(Z) * sizeof(T), PDim<I>::stride(Y) * sizeof(T), PDim<I>::stride(Z) * sizeof(T), 0, NULL, &event));
+			CHECK_CL_ERROR(clWaitForEvents(1, &event));
+			CHECK_CL_ERROR(clReleaseEvent(event));
+		}
+		origTo[d] += (d == X) ? 4 : 1;
+	}
+	for (I cn = 0; cn != nc; ++cn) {
+		CHECK_CL_ERROR(clReleaseMemObject(subBuf[cn]));
+	}
+	delete[] subBuf;
 }
 
 #endif // USE_OPENCL

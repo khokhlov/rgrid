@@ -26,3 +26,25 @@ TEST_CASE(
 	d1(35, 50, 51, 2) = 777;
 	REQUIRE(d1 == d2);
 }
+
+TEST_CASE(
+		"DArrayContainer",
+		"fillGhost"
+	 )
+{
+	rgrid::DArray<int, int> d;
+	d.resize(30, 20, 10);
+	d.alloc(2);
+	d.fill(3);
+	d.val(0, 0, 0, 0) = 5;
+	d.fillGhost(rgrid::Y, rgrid::SIDE_LEFT);
+	REQUIRE(d.val(0, -1, 0, 0) == 5);
+	rgrid::DArrayContainer<int, int> dac(d, 5, 5, 3);
+	dac.getNode(5, 2, 3, 0) = 17;
+	dac.fillGhost();
+	REQUIRE(dac.getDArrayPart(0, 0, 0).val(-2, 0, 0, 0) == 5);
+	REQUIRE(dac.getDArrayPart(0, 0, 0).val(5, 2, 3, 0) == 17);
+	REQUIRE(dac.getDArrayPart(1, 0, 0).val(-1, 2, 3, 0) == 17);
+	REQUIRE(dac.getDArrayPart(0, 1, 0).val(5, -2, 3, 0) == 17);
+	REQUIRE(dac.getDArrayPart(0, 0, 1).val(5, 2, -1, 0) == 17);
+}

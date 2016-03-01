@@ -85,11 +85,14 @@ public:
 		return getDArrayPart(pn[X], pn[Y], pn[Z]).val(idx[X], idx[Y], idx[Z], cn);
 	}
 	
-	// synchronize ghost nodes
-	void synchronize();
+	/*
+	 * fill fhost nodes of all DArray parts
+	 * with values from adjacent DArrays
+	 */
+	void fillGhost();
 #ifdef USE_OPENCL
-	// synchronize ghost nodes between all devices without copy to host
-	void clDeviceSynchronize();
+	// The same as fillGhost(), but without copy to device
+	void fillGhostCL();
 #endif // USE_OPENCL
 	
 private:
@@ -199,43 +202,45 @@ void DArrayContainer<T, I>::writeLine(std::basic_iostream<char>& stream, I y, I 
 }
 
 template <typename T, typename I>
-void DArrayContainer<T, I>::synchronize() {
+void DArrayContainer<T, I>::fillGhost() {
 	for (I k = 0; k != parts[Z]; ++k)
 	for (I j = 0; j != parts[Y]; ++j)
 	for (I i = 0; i != parts[X]; ++i) {
-		if (i != 0) 
-			(*this)(i, j, k).copyGhost((*this)(i-1, j, k), X, SIDE_LEFT);
-		if (i != parts[X]-1) 
-			(*this)(i, j, k).copyGhost((*this)(i+1, j, k), X, SIDE_RIGHT);
-		if (j != 0) 
-			(*this)(i, j, k).copyGhost((*this)(i, j-1, k), Y, SIDE_LEFT);
-		if (j != parts[Y]-1) 
-			(*this)(i, j, k).copyGhost((*this)(i, j+1, k), Y, SIDE_RIGHT);
-		if (k != 0) 
-			(*this)(i, j, k).copyGhost((*this)(i, j, k-1), Z, SIDE_LEFT);
-		if (k != parts[Z]-1) 
-			(*this)(i, j, k).copyGhost((*this)(i, j, k+1), Z, SIDE_RIGHT);
+		DArray<T, I>& da = getDArrayPart(i, j, k);
+		if (i != 0)          da.copyGhost(getDArrayPart(i-1, j, k), X, SIDE_LEFT);
+		else                 da.fillGhost(X, SIDE_LEFT);
+		if (i != parts[X]-1) da.copyGhost(getDArrayPart(i+1, j, k), X, SIDE_RIGHT);
+		else                 da.fillGhost(X, SIDE_RIGHT);
+		if (j != 0)          da.copyGhost(getDArrayPart(i, j-1, k), Y, SIDE_LEFT);
+		else                 da.fillGhost(Y, SIDE_LEFT);
+		if (j != parts[Y]-1) da.copyGhost(getDArrayPart(i, j+1, k), Y, SIDE_RIGHT);
+		else                 da.fillGhost(Y, SIDE_RIGHT);
+		if (k != 0)          da.copyGhost(getDArrayPart(i, j, k-1), Z, SIDE_LEFT);
+		else                 da.fillGhost(Z, SIDE_LEFT);
+		if (k != parts[Z]-1) da.copyGhost(getDArrayPart(i, j, k+1), Z, SIDE_RIGHT);
+		else                 da.fillGhost(Z, SIDE_RIGHT);
 	}
 }
 
 #ifdef USE_OPENCL
 template <typename T, typename I>
-void DArrayContainer<T, I>::clDeviceSynchronize() {
+void DArrayContainer<T, I>::fillGhostCL() {
 	for (I k = 0; k != parts[Z]; ++k)
 	for (I j = 0; j != parts[Y]; ++j)
 	for (I i = 0; i != parts[X]; ++i) {
-		if (i != 0) 
-			(*this)(i, j, k).clCopyGhost((*this)(i-1, j, k), X, SIDE_LEFT);
-		if (i != parts[X]-1) 
-			(*this)(i, j, k).clCopyGhost((*this)(i+1, j, k), X, SIDE_RIGHT);
-		if (j != 0) 
-			(*this)(i, j, k).clCopyGhost((*this)(i, j-1, k), Y, SIDE_LEFT);
-		if (j != parts[Y]-1) 
-			(*this)(i, j, k).clCopyGhost((*this)(i, j+1, k), Y, SIDE_RIGHT);
-		if (k != 0) 
-			(*this)(i, j, k).clCopyGhost((*this)(i, j, k-1), Z, SIDE_LEFT);
-		if (k != parts[Z]-1) 
-			(*this)(i, j, k).clCopyGhost((*this)(i, j, k+1), Z, SIDE_RIGHT);
+		DArray<T, I>& da = getDArrayPart(i, j, k);
+		if (i != 0)          da.copyGhostCL(getDArrayPart(i-1, j, k), X, SIDE_LEFT);
+		else                 da.fillGhostCL(X, SIDE_LEFT);
+		if (i != parts[X]-1) da.copyGhostCL(getDArrayPart(i+1, j, k), X, SIDE_RIGHT);
+		else                 da.fillGhostCL(X, SIDE_RIGHT);
+		if (j != 0)          da.copyGhostCL(getDArrayPart(i, j-1, k), Y, SIDE_LEFT);
+		else                 da.fillGhostCL(Y, SIDE_LEFT);
+		if (j != parts[Y]-1) da.copyGhostCL(getDArrayPart(i, j+1, k), Y, SIDE_RIGHT);
+		else                 da.fillGhostCL(Y, SIDE_RIGHT);
+		if (k != 0)          da.copyGhostCL(getDArrayPart(i, j, k-1), Z, SIDE_LEFT);
+		else                 da.fillGhostCL(Z, SIDE_LEFT);
+		if (k != parts[Z]-1) da.copyGhostCL(getDArrayPart(i, j, k+1), Z, SIDE_RIGHT);
+		else                 da.fillGhostCL(Z, SIDE_RIGHT);
 	}
 }
 #endif // USE_OPENCL

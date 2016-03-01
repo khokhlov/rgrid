@@ -8,6 +8,8 @@
 #include "rgrid/types.h"
 #include "rgrid/utils.h"
 
+
+
 namespace rgrid {
 template <typename T>
 class PDim {
@@ -37,7 +39,7 @@ class PDim {
 		T ghost() const { return ghost(X); }
 
 		T size(const CartDir &d) const { return all_ext[d]; }
-		T size() const { return allocalSize; }
+		T size() const { return all_size; }
 
 		T localSize(const CartDir &d) const { return local_ext[d]; }
 		T localSize() const { return local_size; }
@@ -81,7 +83,7 @@ class PDim {
 
 		const static int GHOST_SIZE = 2;
 		int all_ext[ALL_DIRS];
-		int allocalSize;
+		int all_size;
 		int all_stride[ALL_DIRS];
 
 		int local_ext[ALL_DIRS];
@@ -254,7 +256,7 @@ void PDim<T>::resize(const T& x, const T& y, const T& z, const T& px, const T& p
 	ghost_size[Z] = gz;
 
 	// Calculate auxilary variables.
-	allocalSize = all_ext[X] * all_ext[Y] * all_ext[Z];
+	all_size = all_ext[X] * all_ext[Y] * all_ext[Z];
 
 	all_stride[X] = 1;
 	all_stride[Y] = all_ext[X];
