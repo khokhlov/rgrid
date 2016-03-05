@@ -44,8 +44,8 @@ template <typename T, typename I>
 void saveData(std::iostream& stream, const DArrayContainer<T, I>& dArrayContainer, rgio::format fmt) {
 	writeHeader(stream, dArrayContainer, fmt);
 	stream << "DATA START" << std::endl;
-	for (I z = 0; z != dArrayContainer.size(Z); ++z) {
-		for (I y = 0; y != dArrayContainer.size(Y); ++y) {
+	for (I z = 0; z != dArrayContainer.numNodes(Z); ++z) {
+		for (I y = 0; y != dArrayContainer.numNodes(Y); ++y) {
 			dArrayContainer.writeLine(stream, y, z, fmt);
 		}
 	}
