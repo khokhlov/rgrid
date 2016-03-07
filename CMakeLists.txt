@@ -31,10 +31,11 @@ target_link_libraries(test_rgio rgrid ${EXTRA_LIBS})
 add_executable(test_darraycontainer tests/test_darraycontainer.cpp)
 target_link_libraries(test_darraycontainer rgrid ${EXTRA_LIBS})
 
+add_executable(test_darrayscatter tests/test_darrayscatter.cpp)
+target_link_libraries(test_darrayscatter rgrid ${EXTRA_LIBS})
+
 add_executable(test_pdim tests/test_pdim.cpp)
 target_link_libraries(test_pdim rgrid ${EXTRA_LIBS})
 
-if(USE_OPENCL)
 add_executable(test_clwrapper tests/test_clwrapper.cpp)
 target_link_libraries(test_clwrapper rgrid ${EXTRA_LIBS})
-endif(USE_OPENCL)

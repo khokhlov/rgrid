@@ -415,7 +415,7 @@ void DArray<T, I>::fillGhostCL(const CartDir &d, const CartSide &s) {
 			CHECK_CL_ERROR(clWaitForEvents(1, &event));
 			CHECK_CL_ERROR(clReleaseEvent(event));
 		}
-		origTo[d] += (d == X) ? 4 : 1;
+		origTo[d] += (d == X) ? sizeof(T) : 1;
 	}
 	for (I cn = 0; cn != nc; ++cn) {
 		CHECK_CL_ERROR(clReleaseMemObject(subBuf[cn]));

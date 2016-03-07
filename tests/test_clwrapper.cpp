@@ -10,6 +10,8 @@
 
 using namespace std;
 
+#ifdef USE_OPENCL
+
 const char* kernelAdd10src = 
 "__kernel void add10(int nx, int ny, int nz, int nc, __global const int* in, __global int* out) {"
 "	const int i = get_global_id(0);"
@@ -187,3 +189,5 @@ TEST_CASE(
 		}
 	}
 }
+
+#endif /* USE_OPENCL */

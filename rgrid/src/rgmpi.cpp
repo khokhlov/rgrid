@@ -99,5 +99,38 @@ void forceFinalize()
 		MPI_CHECK(MPI_Finalize());
 	}
 }
-};
+
+void cartCreate(MPI_Comm& cartComm, int const parts[3]) 
+{
+	int periods[3] = { false, false, false };
+	int iParts[3] = { parts[2], parts[1], parts[0] };
+	MPI_CHECK(MPI_Cart_create(MPI_COMM_WORLD, 3, iParts, periods, true, &cartComm));
+}
+
+void cartCoords(MPI_Comm cartComm, int const rank, int coords[3]) 
+{
+	int iCoords[3];
+	MPI_CHECK(MPI_Cart_coords(cartComm, rank, 3, iCoords));
+	for (int i = 0; i != 3; ++i) {
+		coords[2 - i] = iCoords[i];
+	}
+}
+
+int cartRank(MPI_Comm const cartComm, int const coords[3]) 
+{
+	int rank;
+	int iCoords[3] = { coords[2], coords[1], coords[0] };
+	MPI_CHECK(MPI_Cart_rank(cartComm, iCoords, &rank));
+	return rank;
+}
+
+template <> MPI_Datatype getMPItype<int>() { return MPI_INT; } 
+template <> MPI_Datatype getMPItype<float>() { return MPI_FLOAT; } 
+template <> MPI_Datatype getMPItype<double>() { return MPI_DOUBLE; } 
+
+void freeSubarrayType(MPI_Datatype dt) {
+	MPI_CHECK(MPI_Type_free(&dt));
+}
+
+} /* namespace rgmpi */
 #endif // USE_MPI

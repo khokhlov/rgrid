@@ -30,7 +30,7 @@ public:
 	 * sz is entire size in nodes in each direction
 	 * pt is number of parts to devide
 	 */
-	void setCutParams(I sz[ALL_DIRS], I pt[ALL_DIRS]) {
+	void setCutParams(I const sz[ALL_DIRS], I const pt[ALL_DIRS]) {
 		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d+1)) {
 			parts[d] = pt[d];
 			size[d] = sz[d];
@@ -55,6 +55,19 @@ public:
 	/* index of part in linear array */
 	I linInd(const I i, const I j, const I k) const {
 		return k * parts[X] * parts[Y] + j * parts[X] + i;
+	}
+	/* convert linear index to vector (i, j, k) */
+	void vecInd(const I lin, I vec[ALL_DIRS]) const {
+		vec[Z] = lin / (parts[X] * parts[Y]);
+		const I lin2 = lin % (parts[X] * parts[Y]);
+		vec[Y] = lin2 / parts[X];
+		vec[X] = lin2 % parts[X];
+	}
+	/* convert linear index to i, j or k */
+	void vecInd(const I lin, CartDir dir) const {
+		I vec[ALL_DIRS];
+		vecInd(lin, vec);
+		return vec[dir]; 
 	}
 	/* number of all nodes */
 	I numNodes() const { return size[X] * size[Y] * size[Z]; }
