@@ -49,28 +49,19 @@ public:
 	 */
 	DArrayContainer<T, I>& getLocalContainer() { return dac; }
 	/*
-	 * Scatter DArray from process that calls this functon
-	 * Only one process call this function
-	 * da - array to scatter
-	 */
-	void setAndScatter(DArray<T, I> const& da);
-	/*
 	 * Scatter DArray from process with rank == processRank in cart comm
-	 * All processes except one call this function
-	 * processRank - rank of process to receive
+	 * All processes in cart comm call this function
+	 * da - array to scatter
+	 * processes with rank != processRank set dummy DArray in da that remains unchanged
 	 */
-	void setAndScatter(int const processRank = MPI_ANY_SOURCE);
-	/*
-	 * Gather DArray from process that calls this functon
-	 * Only one process call this function 
-	 */
-	void gatherAndGet(DArray<T, I>& da);
+	void setAndScatter(int const processRank, DArray<T, I> const& da);
 	/*
 	 * Gather DArray to process with rank == processRank in cart comm
-	 * All processes except one call this function
-	 * processRank - rank to send parts
+	 * All processes in cart comm call this function
+	 * process with rank == processRank receive full DArray in da,
+	 * da on other processes remains unchanged
 	 */
-	void gatherAndGet(int processRank);
+	void gatherAndGet(int const processRank, DArray<T, I>& da);
 	/*
 	 * fill ghost nodes of local DArrays in local DArrayContainer by 
 	 * 1) copying them from other processes
@@ -156,40 +147,41 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
 }
 
 template <typename T, typename I>
-void DArrayScatter<T, I>::setAndScatter(const DArray<T, I>& da) {
-	RG_ASSERT(RGCut<I>::numNodes() == da.localSize(), "Wrong number of nodes");
+void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> const& da) {
 	std::vector<MPI_Request> req;
-	req.resize(RGCut<I>::numParts());
-	// send parts to all processes
-	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
-	for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
-	for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
-		I destCoord[ALL_DIRS] = { i, j, k };
-		int destRank = rgmpi::cartRank(cartComm, destCoord);
-		MPI_CHECK(MPI_Isend(&da[0], 1, subArrayDt[destRank], destRank, SCATTER, cartComm, &req[destRank]));
+	if (processRank == cartRank) {
+		RG_ASSERT(RGCut<I>::numNodes() == da.localSize(), "Wrong number of nodes");
+		req.resize(RGCut<I>::numParts());
+		// send parts to all processes
+		for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
+		for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
+		for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
+			I destCoord[ALL_DIRS] = { i, j, k };
+			int destRank = rgmpi::cartRank(cartComm, destCoord);
+			MPI_CHECK(MPI_Isend(&da[0], 1, subArrayDt[destRank], destRank, SCATTER, cartComm, &req[destRank]));
+		}
 	}
-	// receive own part
-	setAndScatter(cartRank);
-	// wait while all parts will be received
-	MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
-}
-
-template <typename T, typename I>
-void DArrayScatter<T, I>::setAndScatter(int const processRank) {
-	DArray<T, I> da; // temporary darray
-	da.resize(RGCut<I>::numNodes(X),
-	          RGCut<I>::numNodes(Y),
-	          RGCut<I>::numNodes(Z),
-	          RGCut<I>::partNodes(X, cartPos[X]), 
-	          RGCut<I>::partNodes(Y, cartPos[Y]), 
-	          RGCut<I>::partNodes(Z, cartPos[Z]),
-	          RGCut<I>::partOrigin(X, cartPos[X]),
-	          RGCut<I>::partOrigin(Y, cartPos[Y]),
-	          RGCut<I>::partOrigin(Z, cartPos[Z]),
-	          ghost[X], ghost[Y], ghost[Z]);
-	da.alloc(nc);
-	MPI_CHECK(MPI_Recv(&da[0], 1, arrayDt[cartRank], processRank, SCATTER, cartComm, MPI_STATUS_IGNORE));
-	dac.setDArray(da, localPt[X], localPt[Y], localPt[Z]);
+	
+	DArray<T, I> tda; // temporary darray
+	tda.resize(
+		RGCut<I>::numNodes(X),
+		RGCut<I>::numNodes(Y),
+		RGCut<I>::numNodes(Z),
+		RGCut<I>::partNodes(X, cartPos[X]), 
+		RGCut<I>::partNodes(Y, cartPos[Y]), 
+		RGCut<I>::partNodes(Z, cartPos[Z]),
+		RGCut<I>::partOrigin(X, cartPos[X]),
+		RGCut<I>::partOrigin(Y, cartPos[Y]),
+		RGCut<I>::partOrigin(Z, cartPos[Z]),
+		ghost[X], ghost[Y], ghost[Z]);
+	tda.alloc(nc);
+	MPI_CHECK(MPI_Recv(&tda[0], 1, arrayDt[cartRank], processRank, SCATTER, cartComm, MPI_STATUS_IGNORE));
+	dac.setDArray(tda, localPt[X], localPt[Y], localPt[Z]);
+	
+	if (processRank == cartRank) {
+		// wait while all parts will be received
+		MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
+	}
 }
 
 template <typename T, typename I>
@@ -250,33 +242,34 @@ DArrayScatter<T, I>::~DArrayScatter() {
 }
 
 template<typename T, typename I>
-void DArrayScatter<T, I>::gatherAndGet(DArray<T, I>& da ) {
-	da.resize(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
-	          RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
-	          0, 0, 0,
-	          ghost[X], ghost[Y], ghost[Z]);
-	da.alloc(nc);
+void DArrayScatter<T, I>::gatherAndGet(int processRank, DArray<T, I>& da) {
 	std::vector<MPI_Request> req;
-	req.resize(RGCut<I>::numParts());
-	// recv parts from all processes
-	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
-	for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
-	for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
-		I srcCoord[ALL_DIRS] = { i, j, k };
-		int srcRank = rgmpi::cartRank(cartComm, srcCoord);
-		MPI_CHECK(MPI_Irecv(&da[0], 1, subArrayDt[srcRank], srcRank, GATHER, cartComm, &req[srcRank]));
+	if (processRank == cartRank) {
+		da.resize(
+			RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
+			RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
+			0, 0, 0,
+			ghost[X], ghost[Y], ghost[Z]);
+		da.alloc(nc);
+		req.resize(RGCut<I>::numParts());
+		// recv parts from all processes
+		for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
+		for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
+		for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
+			I srcCoord[ALL_DIRS] = { i, j, k };
+			int srcRank = rgmpi::cartRank(cartComm, srcCoord);
+			MPI_CHECK(MPI_Irecv(&da[0], 1, subArrayDt[srcRank], srcRank, GATHER, cartComm, &req[srcRank]));
+		}
 	}
-	// gather own part
-	gatherAndGet(cartRank);
-	// wait while all parts will be received
-	MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
-}
-
-template<typename T, typename I>
-void DArrayScatter<T, I>::gatherAndGet(int processRank) {
-	DArray<T, I> da;
-	dac.getDArray(da);
-	MPI_CHECK(MPI_Send(&da[0], 1, arrayDt[cartRank], processRank, GATHER, cartComm));
+	
+	DArray<T, I> tda;
+	dac.getDArray(tda);
+	MPI_CHECK(MPI_Send(&tda[0], 1, arrayDt[cartRank], processRank, GATHER, cartComm));
+	
+	if (processRank == cartRank) {
+		// wait while all parts will be received
+		MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
+	}
 }
 
 } /* namespace rgrid */

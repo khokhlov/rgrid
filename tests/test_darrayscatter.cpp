@@ -19,7 +19,6 @@ TEST_CASE(
 	
 	if (rgmpi::worldSize() == 3 * 2 * 2) {
 	
-		rgrid::DArray<int, int> d1, d2;
 		rgrid::DArrayScatter<int, int> das;
 		int const size[3] = { 100, 200, 150 };
 		int const gp[3] = { 3, 2, 2 };
@@ -28,18 +27,20 @@ TEST_CASE(
 		das.setSizes(size, gp, lp, ghost, 3);
 			
 		if (das.getInternalRank() == 0) {
+			rgrid::DArray<int, int> d1, d2;
 			d1.resize(100, 200, 150);
 			d1.alloc(3);
 			d1.fill(2);
 			d1(3, 3, 3, 0) = 7;
 			d1(3, 3, 3, 1) = 8;
 			d1.fillGhost();
-			das.setAndScatter(d1);
-			das.gatherAndGet(d2);
+			das.setAndScatter(0, d1);
+			das.gatherAndGet(0, d2);
 			REQUIRE(d1 == d2);
 		} else {
-			das.setAndScatter(0);
-			das.gatherAndGet(0);
+			rgrid::DArray<int, int> d1, d2;
+			das.setAndScatter(0, d1);
+			das.gatherAndGet(0, d2);
 		}
 	}
 	
