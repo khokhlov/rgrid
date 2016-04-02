@@ -25,7 +25,7 @@ TEST_CASE(
 		int const lp[3] = { 3, 4, 5 };
 		int const ghost[3] = { 2, 2, 2 };
 		das.setSizes(size, gp, lp, ghost, 3);
-			
+		
 		if (das.getInternalRank() == 0) {
 			rgrid::DArray<int, int> d1, d2;
 			d1.resize(100, 200, 150);

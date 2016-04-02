@@ -42,6 +42,7 @@ TEST_CASE(
 	rgrid::DArrayContainer<int, int> dac(d, 5, 5, 3);
 	dac.getNode(5, 2, 3, 0) = 17;
 	dac.fillGhost();
+	dac.sync();
 	REQUIRE(dac.getDArrayPart(0, 0, 0).val(-2, 0, 0, 0) == 5);
 	REQUIRE(dac.getDArrayPart(0, 0, 0).val(5, 2, 3, 0) == 17);
 	REQUIRE(dac.getDArrayPart(1, 0, 0).val(-1, 2, 3, 0) == 17);

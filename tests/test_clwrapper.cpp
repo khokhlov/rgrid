@@ -175,6 +175,7 @@ TEST_CASE(
 				CHECK_CL_ERROR(clReleaseProgram(program));
 			}
 			dac.fillGhostCL();
+			dac.syncCL();
 			for (int k = 0; k != dac.numParts(); ++k) {
 				dac.getDArrayPart(k).clDtoH();
 			}

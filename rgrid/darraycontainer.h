@@ -57,13 +57,31 @@ public:
 	}
 	
 	/*
-	 * fill fhost nodes of all DArray parts
-	 * with values from adjacent DArrays
+	 * copy rect region with size: sz, sy, sz and start: ox, oy, oz to buffer
+	 */
+	void getSubArray(I ox, I oy, I oz, I sx, I sy, I sz, std::vector<T>& buffer);
+	/*
+	 * copy rect region with size: sz, sy, sz and start: ox, oy, oz from buffer
+	 * buffer must contain sx * sy * sz * cn elements
+	 */
+	void setSubArray(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T>& buffer);
+	/*
+	 * fill boundary ghost nodes with values from nearest nodes
 	 */
 	void fillGhost();
+	/*
+	 * fill fhost nodes of all DArray parts with values from adjacent DArrays
+	 */
+	void sync();
 #ifdef USE_OPENCL
-	// The same as fillGhost(), but without copy to device
+	/*
+	 * The same as fillGhost(), but without copy to host
+	 */
 	void fillGhostCL();
+	/*
+	 * The same as sync(), but without copy to host
+	 */
+	void syncCL();
 #endif // USE_OPENCL
 	
 private:	
@@ -126,6 +144,50 @@ void DArrayContainer<T, I>::getDArray(DArray<T, I>& da) const {
 }
 
 template <typename T, typename I>
+void DArrayContainer<T, I>::getSubArray(I ox, I oy, I oz, I sx, I sy, I sz, std::vector<T>& buffer) {
+	I nc = dArray.front().getNC();
+	buffer.clear();
+	buffer.reserve(sx * sy * sz * nc);
+	for (I cn = 0; cn != nc; ++cn)
+	for (I z = 0; z != sz; ++z)
+	for (I y = 0; y != sy; ++y)
+	for (I x = 0; x != sx; ++x) {
+		I xp = ox + x;
+		I yp = oy + y;
+		I zp = oz + z;
+		I partX = RGCut<I>::locatePart(X, xp);
+		I partY = RGCut<I>::locatePart(Y, yp);
+		I partZ = RGCut<I>::locatePart(Z, zp);
+		I nodeX = RGCut<I>::locateIndex(X, xp);
+		I nodeY = RGCut<I>::locateIndex(Y, yp);
+		I nodeZ = RGCut<I>::locateIndex(Z, zp);
+		buffer.push_back(dArray[RGCut<I>::linInd(partX, partY, partZ)].val(nodeX, nodeY, nodeZ, cn));
+	}
+}
+
+template <typename T, typename I>
+void DArrayContainer<T, I>::setSubArray(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T>& buffer) {
+	I nc = dArray[0].getNC();
+	RG_ASSERT(buffer.size() == sx * sy * sz * nc, "Wrong buffer size");
+	I bufInd = 0;
+	for (I cn = 0; cn != nc; ++cn)
+	for (I z = 0; z != sz; ++z)
+	for (I y = 0; y != sy; ++y)
+	for (I x = 0; x != sx; ++x) {
+		I xp = ox + x;
+		I yp = oy + y;
+		I zp = oz + z;
+		I partX = RGCut<I>::locatePart(X, xp);
+		I partY = RGCut<I>::locatePart(Y, yp);
+		I partZ = RGCut<I>::locatePart(Z, zp);
+		I nodeX = RGCut<I>::locateIndex(X, xp);
+		I nodeY = RGCut<I>::locateIndex(Y, yp);
+		I nodeZ = RGCut<I>::locateIndex(Z, zp);
+		dArray.at(RGCut<I>::linInd(partX, partY, partZ)).val(nodeX, nodeY, nodeZ, cn) = buffer.at(bufInd++);
+	}
+}
+
+template <typename T, typename I>
 void DArrayContainer<T, I>::writeLine(std::basic_iostream<char>& stream, I y, I z, rgio::format fmt) const {
 	I pn[ALL_DIRS] = { 0, RGCut<I>::locatePart(Y, y), RGCut<I>::locatePart(Z, z) };
 	I idx[ALL_DIRS] = { 0, RGCut<I>::locateIndex(Y, y), RGCut<I>::locateIndex(Z, z) };
@@ -135,45 +197,63 @@ void DArrayContainer<T, I>::writeLine(std::basic_iostream<char>& stream, I y, I 
 }
 
 template <typename T, typename I>
-void DArrayContainer<T, I>::fillGhost() {
+void DArrayContainer<T, I>::sync() {
 	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
 	for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
 	for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
 		DArray<T, I>& da = getDArrayPart(i, j, k);
 		if (i != 0)                       da.copyGhost(getDArrayPart(i-1, j, k), X, SIDE_LEFT);
-		else                              da.fillGhost(X, SIDE_LEFT);
 		if (i != RGCut<I>::numParts(X)-1) da.copyGhost(getDArrayPart(i+1, j, k), X, SIDE_RIGHT);
-		else                              da.fillGhost(X, SIDE_RIGHT);
 		if (j != 0)                       da.copyGhost(getDArrayPart(i, j-1, k), Y, SIDE_LEFT);
-		else                              da.fillGhost(Y, SIDE_LEFT);
 		if (j != RGCut<I>::numParts(Y)-1) da.copyGhost(getDArrayPart(i, j+1, k), Y, SIDE_RIGHT);
-		else                              da.fillGhost(Y, SIDE_RIGHT);
 		if (k != 0)                       da.copyGhost(getDArrayPart(i, j, k-1), Z, SIDE_LEFT);
-		else                              da.fillGhost(Z, SIDE_LEFT);
 		if (k != RGCut<I>::numParts(Z)-1) da.copyGhost(getDArrayPart(i, j, k+1), Z, SIDE_RIGHT);
-		else                              da.fillGhost(Z, SIDE_RIGHT);
+	}
+}
+
+template <typename T, typename I>
+void DArrayContainer<T, I>::fillGhost() {
+	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
+	for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
+	for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
+		DArray<T, I>& da = getDArrayPart(i, j, k);
+		if (i == 0)                       da.fillGhost(X, SIDE_LEFT);
+		if (j == RGCut<I>::numParts(X)-1) da.fillGhost(X, SIDE_RIGHT);
+		if (j == 0)                       da.fillGhost(Y, SIDE_LEFT);
+		if (j == RGCut<I>::numParts(Y)-1) da.fillGhost(Y, SIDE_RIGHT);
+		if (k == 0)                       da.fillGhost(Z, SIDE_LEFT);
+		if (k == RGCut<I>::numParts(Z)-1) da.fillGhost(Z, SIDE_RIGHT);
 	}
 }
 
 #ifdef USE_OPENCL
+template <typename T, typename I>
+void DArrayContainer<T, I>::syncCL() {
+	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
+	for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
+	for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
+		DArray<T, I>& da = getDArrayPart(i, j, k);
+		if (i != 0)                       da.copyGhostCL(getDArrayPart(i-1, j, k), X, SIDE_LEFT);
+		if (i != RGCut<I>::numParts(X)-1) da.copyGhostCL(getDArrayPart(i+1, j, k), X, SIDE_RIGHT);
+		if (j != 0)                       da.copyGhostCL(getDArrayPart(i, j-1, k), Y, SIDE_LEFT);
+		if (j != RGCut<I>::numParts(Y)-1) da.copyGhostCL(getDArrayPart(i, j+1, k), Y, SIDE_RIGHT);
+		if (k != 0)                       da.copyGhostCL(getDArrayPart(i, j, k-1), Z, SIDE_LEFT);
+		if (k != RGCut<I>::numParts(Z)-1) da.copyGhostCL(getDArrayPart(i, j, k+1), Z, SIDE_RIGHT);
+	}
+}
+
 template <typename T, typename I>
 void DArrayContainer<T, I>::fillGhostCL() {
 	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
 	for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
 	for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
 		DArray<T, I>& da = getDArrayPart(i, j, k);
-		if (i != 0)                       da.copyGhostCL(getDArrayPart(i-1, j, k), X, SIDE_LEFT);
-		else                              da.fillGhostCL(X, SIDE_LEFT);
-		if (i != RGCut<I>::numParts(X)-1) da.copyGhostCL(getDArrayPart(i+1, j, k), X, SIDE_RIGHT);
-		else                              da.fillGhostCL(X, SIDE_RIGHT);
-		if (j != 0)                       da.copyGhostCL(getDArrayPart(i, j-1, k), Y, SIDE_LEFT);
-		else                              da.fillGhostCL(Y, SIDE_LEFT);
-		if (j != RGCut<I>::numParts(Y)-1) da.copyGhostCL(getDArrayPart(i, j+1, k), Y, SIDE_RIGHT);
-		else                              da.fillGhostCL(Y, SIDE_RIGHT);
-		if (k != 0)                       da.copyGhostCL(getDArrayPart(i, j, k-1), Z, SIDE_LEFT);
-		else                              da.fillGhostCL(Z, SIDE_LEFT);
-		if (k != RGCut<I>::numParts(Z)-1) da.copyGhostCL(getDArrayPart(i, j, k+1), Z, SIDE_RIGHT);
-		else                              da.fillGhostCL(Z, SIDE_RIGHT);
+		if (i == 0)                       da.fillGhostCL(X, SIDE_LEFT);
+		if (i == RGCut<I>::numParts(X)-1) da.fillGhostCL(X, SIDE_RIGHT);
+		if (j == 0)                       da.fillGhostCL(Y, SIDE_LEFT);
+		if (j == RGCut<I>::numParts(Y)-1) da.fillGhostCL(Y, SIDE_RIGHT);
+		if (k == 0)                       da.fillGhostCL(Z, SIDE_LEFT);
+		if (k == RGCut<I>::numParts(Z)-1) da.fillGhostCL(Z, SIDE_RIGHT);
 	}
 }
 #endif // USE_OPENCL

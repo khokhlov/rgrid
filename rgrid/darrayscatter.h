@@ -11,9 +11,6 @@ namespace rgrid {
 
 /*
  * DArrayScatter splits DArray into parts, send them to different processes and synchronize them
- * 1. call setSizes() or create by constructor with the same params, params must be equal on all processes
- * 2. call setAndScatter() on one process
- * 3. use getLocalContainer() and fillGhost() on all processes to work with local part
  */
 template <typename T, typename I>
 class DArrayScatter : public RGCut<I> {
@@ -21,14 +18,17 @@ public:
 	/* 
 	 * Use setSizes() if you create object by this constructor
 	 */
-	DArrayScatter() {};
+	DArrayScatter() {
+		this->init();
+	};
 	DArrayScatter(I const size[ALL_DIRS], 
 	              I const globalPt[ALL_DIRS], 
 	              I const localPt[ALL_DIRS], 
 	              I const ghost[ALL_DIRS],
 	              I const nc)
 	{
-		setSizes(size, globalPt, localPt, ghost, nc); 
+		this->init();
+		setSizes(size, globalPt, localPt, ghost, nc);
 	};
 	~DArrayScatter();
 	/*
@@ -64,9 +64,21 @@ public:
 	void gatherAndGet(int const processRank, DArray<T, I>& da);
 	/*
 	 * fill ghost nodes of local DArrays in local DArrayContainer by 
-	 * 1) copying them from other processes
-	 * 2) copying them from other DArrays inside local DArrayContainer
-	 * 3) filling them with values from boundary nodes
+	 * copying them from other DArrays inside local DArrayContainer
+	 */
+	void internalSync();
+	/*
+	 * start to receive ghost ghost for local DArrays in local
+	 * DArrayContainer from other processes
+	 */
+	void externalSyncStart();
+	/*
+	 * wait until all data will be received and written in ghost nodes of local DArrays
+	 */
+	void externalSyncEnd();
+	/*
+	 * fill ghost nodes of local DArrays in local DArrayContainer with 
+	 * values from boundary nodes
 	 */
 	void fillGhost();
 	/* get rank in internal cart comm */
@@ -75,16 +87,24 @@ private:
 	
 	enum mpiTag {
 		SCATTER = 0,
-		GATHER
+		GATHER,
+		SYNC
 	};
 	
 	DArrayScatter(DArrayScatter const&);
 	DArrayScatter& operator=(DArrayScatter const&);
 	
+	/* initialize common things for all constructors */
+	void init() {
+	}
+	
 	/* generate types for scatter, gather */
 	void generateSubarrayTypes();
-	/* release types created by generateSubarrayTypes() */
+	/* release MPI subarray types */
 	void releaseSubarrayTypes(std::vector<MPI_Datatype>& dt);
+	/* send boundary nodes to negihbours */
+	void sendNodesStart(int rank, CartSide side, CartDir dir);
+	void sendNodesEnd();
 	
 	/* container for local darrays */
 	DArrayContainer<T, I> dac;
@@ -96,8 +116,14 @@ private:
 	int cartRank;
 	/* neighbours ranks in cart comm */
 	int neigh[SIDE_ALL][ALL_DIRS];
+	/* external sync buffers */
+	std::vector<T> sendBuf[SIDE_ALL][ALL_DIRS];
+	std::vector<T> recvBuf[SIDE_ALL][ALL_DIRS];
+	/* request for external sync start and end */
+	MPI_Request syncSendReq[SIDE_ALL * ALL_DIRS];
+	MPI_Request syncRecvReq[SIDE_ALL * ALL_DIRS];
 	/* value in neighbours array, if there is no neighbour */
-	static const int NO_NEIGHBOUR = -1;
+	static const I NO_NEIGHBOUR = -1;
 	/* parts in DArrayContainer */
 	I localPt[ALL_DIRS];
 	/* size of ghost */
@@ -270,6 +296,84 @@ void DArrayScatter<T, I>::gatherAndGet(int processRank, DArray<T, I>& da) {
 		// wait while all parts will be received
 		MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
 	}
+}
+
+template<typename T, typename I>
+void DArrayScatter<T, I>::internalSync() {
+	dac.sync();
+}
+
+template<typename T, typename I>
+void DArrayScatter<T, I>::fillGhost() {
+	for (CartSide s = SIDE_LEFT; s != SIDE_ALL; s = static_cast<CartSide>(s + 1))
+		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) 
+			if (neigh[s][d] == NO_NEIGHBOUR) {
+				CartDir ort1, ort2;
+				ortDirs(d, ort1, ort2);
+				I k = (s == SIDE_LEFT) ? 0 : RGCut<I>::numParts(d) - 1;
+				for (I i = 0; i < RGCut<I>::numParts(ort1); i++) 
+				for (I j = 0; j < RGCut<I>::numParts(ort2); j++) {
+					I coord[ALL_DIRS];
+					coord[d] = k;
+					coord[ort1] = i;
+					coord[ort2] = j;
+					I x = coord[X], y = coord[Y], z = coord[Z];
+					DArray<T, I> da = dac.getDArrayPart(x, y, z);
+					da.fillGhost(d, s);
+				}
+			}
+}
+
+template<typename T, typename I>
+void DArrayScatter<T, I>::externalSyncStart() {
+	for (CartSide s = SIDE_LEFT; s != SIDE_ALL; s = static_cast<CartSide>(s + 1))
+		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) 
+			if (neigh[s][d] != NO_NEIGHBOUR) {
+				CartDir ort1, ort2;
+				ortDirs(d, ort1, ort2);
+				I bufSize = RGCut<I>::partNodes(ort1) * RGCut<I>::partNodes(ort2) * ghost[d];
+				// start recv
+				recvBuf[s][d].resize(bufSize);
+				MPI_CHECK(MPI_Irecv(&recvBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
+				// start send
+				// sub array size and position
+				I orig[ALL_DIRS] = { 0, 0, 0 };
+				I size[ALL_DIRS] = {
+					RGCut<I>::partNodes(X, cartPos[X]),
+					RGCut<I>::partNodes(Y, cartPos[Y]), 
+					RGCut<I>::partNodes(Z, cartPos[Z]),
+				};
+				size[d] = ghost[d];
+				orig[d] = (s == SIDE_LEFT) ? 0 : RGCut<I>::numNodes(d) - ghost(d);
+				dac.getSubArray(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], sendBuf[s][d]);
+				MPI_CHECK(MPI_Isend(&sendBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncSendReq[s + d * SIDE_ALL]));
+			} else {
+				syncRecvReq[s + d * SIDE_ALL] = MPI_REQUEST_NULL;
+			}
+}
+
+template<typename T, typename I>
+void DArrayScatter<T, I>::externalSyncEnd() {
+	while (1) {
+		int index;
+		MPI_CHECK(MPI_Waitany(SIDE_ALL * ALL_DIRS, syncRecvReq, &index, MPI_STATUS_IGNORE));
+		if (index == MPI_UNDEFINED) break;
+		CartSide s = index % SIDE_ALL;
+		CartDir d = index / ALL_DIRS;
+		CartDir ort1, ort2;
+		ortDirs(d, ort1, ort2);
+		// sub array size and position
+		I orig[ALL_DIRS] = { 0, 0, 0 };
+		I size[ALL_DIRS] = {
+			RGCut<I>::partNodes(X, cartPos[X]),
+			RGCut<I>::partNodes(Y, cartPos[Y]), 
+			RGCut<I>::partNodes(Z, cartPos[Z]),
+		};
+		size[d] = ghost[d];
+		orig[d] = (s == SIDE_LEFT) ? -ghost[d] : RGCut<I>::numNodes(d);
+		dac.setSubArray(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], recvBuf[s][d]);
+	}
+	MPI_CHECK(MPI_Waitall(SIDE_ALL * ALL_DIRS, syncSendReq, MPI_STATUSES_IGNORE));
 }
 
 } /* namespace rgrid */
