@@ -83,6 +83,22 @@ public:
 	void fillGhost();
 	/* get rank in internal cart comm */
 	int getInternalRank() { return cartRank; }
+	/* get number of components */
+	I getNC() { return nc; }
+	/* get number of ghost nodes */
+	I getGhost(CartDir d) { return ghost[d]; }
+	/* get type for file view in IO operations */
+	MPI_Datatype fileViewType() {
+		return viewType;
+	}
+	/* return local DArrayContainer */
+	DArrayContainer<T, I>& getDAC() { return dac; }
+	/* get type for darray with indexes x, y, z */
+	MPI_Datatype getDArrayDt(I x, I y, I z) { return arrayDt.at(RGCut<I>::linInd(x, y, z)); }
+	/* get DArray with indexes x, y, z in local DArrayContainer */
+	DArray<T, I>& getDArrayPart(I x, I y, I z) { return dac.getDArrayPart(x, y, z); }
+	/* get buffer of DArray with indexes x, y, z in local DArrayContainer */
+	T* getDArrayBuffer(I x, I y, I z) { return &dac.getDArrayPart(x, y, z)[0]; }
 private:
 	
 	enum mpiTag {
@@ -96,6 +112,7 @@ private:
 	
 	/* initialize common things for all constructors */
 	void init() {
+		viewType = MPI_DATATYPE_NULL;
 	}
 	
 	/* generate types for scatter, gather */
@@ -134,6 +151,8 @@ private:
 	std::vector<MPI_Datatype> subArrayDt;
 	/* types for every subarray itself */
 	std::vector<MPI_Datatype> arrayDt;
+	/* view type */
+	MPI_Datatype viewType;
 };
 
 template <typename T, typename I>
@@ -223,34 +242,58 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 		int rank = rgmpi::cartRank(cartComm, cartRank3);
 		{
 			// generate subArrayDt
-			int array_of_sizes[4] = { RGCut<I>::numNodes(X) + 2 * ghost[X], 
-			                          RGCut<I>::numNodes(Y) + 2 * ghost[Y], 
-			                          RGCut<I>::numNodes(Z) + 2 * ghost[Z], 
-			                          nc };
-			int array_of_subsizes[4] = { RGCut<I>::partNodes(X, i),
-			                             RGCut<I>::partNodes(Y, j),
-			                             RGCut<I>::partNodes(Z, k),
-			                             nc };
-			int array_of_starts[4] = { ghost[X] + RGCut<I>::partOrigin(X, i), 
-			                           ghost[Y] + RGCut<I>::partOrigin(Y, j),
-			                           ghost[Z] + RGCut<I>::partOrigin(Z, k),
-			                           0 };
+			int array_of_sizes[4] = { 
+				RGCut<I>::numNodes(X) + 2 * ghost[X], 
+				RGCut<I>::numNodes(Y) + 2 * ghost[Y], 
+				RGCut<I>::numNodes(Z) + 2 * ghost[Z], 
+				nc };
+			int array_of_subsizes[4] = { 
+				RGCut<I>::partNodes(X, i),
+				RGCut<I>::partNodes(Y, j),
+				RGCut<I>::partNodes(Z, k),
+				nc };
+			int array_of_starts[4] = { 
+				ghost[X] + RGCut<I>::partOrigin(X, i), 
+				ghost[Y] + RGCut<I>::partOrigin(Y, j),
+				ghost[Z] + RGCut<I>::partOrigin(Z, k),
+				0 };
 			subArrayDt[rank] = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
 		}
 		{
 			// generate arrayDt
-			int array_of_sizes[4] = { RGCut<I>::partNodes(X, i) + 2 * ghost[X],
-			                          RGCut<I>::partNodes(Y, j) + 2 * ghost[Y], 
-			                          RGCut<I>::partNodes(Z, k) + 2 * ghost[Z], 
-			                          nc };
+			int array_of_sizes[4] = { 
+				RGCut<I>::partNodes(X, i) + 2 * ghost[X],
+				RGCut<I>::partNodes(Y, j) + 2 * ghost[Y], 
+				RGCut<I>::partNodes(Z, k) + 2 * ghost[Z], 
+				nc };
 			int array_of_subsizes[4] = { RGCut<I>::partNodes(X, i),
-			                             RGCut<I>::partNodes(Y, j),
-			                             RGCut<I>::partNodes(Z, k),
-			                             nc };
+				RGCut<I>::partNodes(Y, j),
+				RGCut<I>::partNodes(Z, k),
+				nc };
 			int array_of_starts[4] = { ghost[X], ghost[Y], ghost[Z], 0 };
 			arrayDt[rank] = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
 		}
 	}
+	// make view type
+	int array_of_sizes[4] = { 
+		RGCut<I>::numNodes(X), 
+		RGCut<I>::numNodes(Y), 
+		RGCut<I>::numNodes(Z), 
+		nc
+	};
+	int array_of_subsizes[4] = { 
+		RGCut<I>::partNodes(X, cartPos[X]),
+		RGCut<I>::partNodes(Y, cartPos[Y]),
+		RGCut<I>::partNodes(Z, cartPos[Z]),
+		nc
+	};
+	int array_of_starts[4] = {
+		RGCut<I>::partOrigin(X, cartPos[X]), 
+		RGCut<I>::partOrigin(Y, cartPos[Y]),
+		RGCut<I>::partOrigin(Z, cartPos[Z]),
+		0
+	};
+	viewType = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
 }
 
 template <typename T, typename I>
@@ -265,6 +308,9 @@ template<typename T, typename I>
 DArrayScatter<T, I>::~DArrayScatter() {
 	releaseSubarrayTypes(subArrayDt);
 	releaseSubarrayTypes(arrayDt);
+	if (viewType != MPI_DATATYPE_NULL) {
+		rgmpi::freeSubarrayType(viewType);
+	}
 }
 
 template<typename T, typename I>
@@ -366,7 +412,7 @@ void DArrayScatter<T, I>::externalSyncEnd() {
 		I orig[ALL_DIRS] = { 0, 0, 0 };
 		I size[ALL_DIRS] = {
 			RGCut<I>::partNodes(X, cartPos[X]),
-			RGCut<I>::partNodes(Y, cartPos[Y]), 
+			RGCut<I>::partNodes(Y, cartPos[Y]),
 			RGCut<I>::partNodes(Z, cartPos[Z]),
 		};
 		size[d] = ghost[d];
