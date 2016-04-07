@@ -1,5 +1,6 @@
 #include "rgrid/clutils.h"
 
+#ifdef USE_OPENCL
 #include "CL/opencl.h"
 #include <iostream>
 
@@ -87,3 +88,5 @@ const char* clErrorToStr(cl_int code)
 }
 
 } // namespace rgrid
+
+#endif // USE_OPENCL
