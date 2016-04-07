@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.6)
 project(RGRID)
 SET(CMAKE_COLOR_MAKEFILE ON)
 SET(CMAKE_VERBOSE_MAKEFILE OFF)
-add_definitions(-g -W -Wall -Wl,--no-undefined)
+add_definitions(-g -W -Wall -Wl,--no-undefined -fpermissive)
 include_directories(./)
 
 aux_source_directory(rgrid/src RGRID)
