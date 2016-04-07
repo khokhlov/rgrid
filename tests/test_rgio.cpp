@@ -5,10 +5,7 @@
 #include "rgrid/darray.h"
 #include "rgrid/rgio.h"
 
-TEST_CASE(
-		"rgio",
-		"DArrayInString"
-	 )
+TEST_CASE("rgio DArrayInString")
 {
 	rgrid::DArray<int, int> d1, d2, d3;
 	d1.resize(7, 6, 5);
@@ -26,10 +23,7 @@ TEST_CASE(
 	REQUIRE(d1 == d3);
 }
 
-TEST_CASE(
-		"rgio",
-		"DArrayInFile"
-	 )
+TEST_CASE("rgio DArrayInFile")
 {
 	rgrid::DArray<int, int> d1, d2, d3;
 	d1.resize(5, 10, 1);
@@ -54,10 +48,7 @@ TEST_CASE(
 	REQUIRE(d1 == d3);
 }
 
-TEST_CASE(
-		"rgio",
-		"DArrayContainerInString"
-	 )
+TEST_CASE("rgio DArrayContainerInString")
 {
 	rgrid::DArray<int, int> d1, d2;
 	d1.resize(5, 10, 12);

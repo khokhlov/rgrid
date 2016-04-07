@@ -22,10 +22,7 @@ const char* kernelAdd10src =
 "		out[i + j * nx + k * nx * ny + cn * nx * ny * nz] = in[i + j * nx + k * nx * ny + cn * nx * ny * nz] + 10;"
 "}";
 
-TEST_CASE(
-		"CLWrapper",
-		"oneDeviceDArray"
-	 )
+TEST_CASE("CLWrapper oneDeviceDArray")
 {
 	const clwrapper::CLWrapper& clw = clwrapper::CLWrapper::instance();
 	if (clw.getPlatformsNum() != 0) {
@@ -85,10 +82,7 @@ TEST_CASE(
 	}
 }
 
-TEST_CASE(
-		"CLWrapper",
-		"DArrayFillGhostCL"
-	 )
+TEST_CASE("CLWrapper DArrayFillGhostCL")
 {
 	const clwrapper::CLWrapper& clw = clwrapper::CLWrapper::instance();
 	if (clw.getPlatformsNum() != 0) {
@@ -122,10 +116,7 @@ TEST_CASE(
 	}
 }
 
-TEST_CASE(
-		"CLWrapper",
-		"DArrayContainerFillGhostCL"
-	 )
+TEST_CASE("CLWrapper DArrayContainerFillGhostCL")
 {
 	const clwrapper::CLWrapper& clw = clwrapper::CLWrapper::instance();
 	if (clw.getPlatformsNum() != 0) {

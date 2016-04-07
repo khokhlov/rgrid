@@ -82,23 +82,58 @@ public:
 	 */
 	void fillGhost();
 	/* get rank in internal cart comm */
-	int getInternalRank() { return cartRank; }
+	int getInternalRank() const { return cartRank; }
 	/* get number of components */
-	I getNC() { return nc; }
+	I getNC() const { return nc; }
 	/* get number of ghost nodes */
-	I getGhost(CartDir d) { return ghost[d]; }
+	I getGhost(CartDir d) const { return ghost[d]; }
 	/* get type for file view in IO operations */
-	MPI_Datatype fileViewType() {
-		return viewType;
-	}
+	MPI_Datatype fileViewType() const { return viewType; }
 	/* return local DArrayContainer */
 	DArrayContainer<T, I>& getDAC() { return dac; }
 	/* get type for darray with indexes x, y, z */
-	MPI_Datatype getDArrayDt(I x, I y, I z) { return arrayDt.at(RGCut<I>::linInd(x, y, z)); }
+	MPI_Datatype getDArrayDt(I x, I y, I z) const { return arrayDt.at(RGCut<I>::linInd(x, y, z)); }
 	/* get DArray with indexes x, y, z in local DArrayContainer */
 	DArray<T, I>& getDArrayPart(I x, I y, I z) { return dac.getDArrayPart(x, y, z); }
 	/* get buffer of DArray with indexes x, y, z in local DArrayContainer */
 	T* getDArrayBuffer(I x, I y, I z) { return &dac.getDArrayPart(x, y, z)[0]; }
+	/* start saving data to file */
+	void saveDataBegin(const std::string filename, const rgio::format fmt) {
+		std::stringstream ss;
+		I size[ALL_DIRS] = { RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z) };
+		rgio::writeHeader(ss, size, getNC(), fmt);
+		std::string header = ss.str();
+		// write header
+		if (rgmpi::commRank(cartComm) == 0) {
+			MPI_CHECK(MPI_File_open(MPI_COMM_SELF, filename.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
+			MPI_CHECK(MPI_File_set_view(fh, 0, MPI_CHAR, MPI_CHAR, "native", MPI_INFO_NULL));
+			MPI_CHECK(MPI_File_write(fh, header.c_str(), header.size(), MPI_CHAR, MPI_STATUS_IGNORE));
+			MPI_CHECK(MPI_File_close(&fh));
+		}
+		// write data
+		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
+		MPI_CHECK(MPI_File_set_view(fh, header.size() * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
+		MPI_Request req;
+		saveDataRequest.clear();
+		saveDataRequest.reserve(RGCut<I>::numParts());
+		for (I k = 0; k != dac.numParts(Z); ++k)
+		for (I j = 0; j != dac.numParts(Y); ++j)
+		for (I i = 0; i != dac.numParts(X); ++i) {
+			MPI_CHECK(MPI_File_iwrite(fh, &dac.getDArrayPart(i, j, k)[0], 1, locArrayDt.at(dac.linInd(i, j, k)), &req));
+			saveDataRequest.push_back(req);
+		}
+	}
+	/* Wait while all data will be saved */
+	void saveDataEnd() {
+		MPI_CHECK(MPI_Waitall(saveDataRequest.size(), &saveDataRequest.at(0), MPI_STATUSES_IGNORE));
+		saveDataRequest.clear();
+		MPI_CHECK(MPI_File_close(&fh));
+	}
+private:
+	MPI_File fh;
+	std::vector<MPI_Request> saveDataRequest;
+	std::vector<MPI_Datatype> locArrayDt;
+	
 private:
 	
 	enum mpiTag {
@@ -233,6 +268,7 @@ template <typename T, typename I>
 void DArrayScatter<T, I>::generateSubarrayTypes() {
 	releaseSubarrayTypes(subArrayDt);
 	releaseSubarrayTypes(arrayDt);
+	releaseSubarrayTypes(locArrayDt);
 	subArrayDt.resize(RGCut<I>::numParts());
 	arrayDt.resize(RGCut<I>::numParts());
 	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
@@ -266,7 +302,8 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 				RGCut<I>::partNodes(Y, j) + 2 * ghost[Y], 
 				RGCut<I>::partNodes(Z, k) + 2 * ghost[Z], 
 				nc };
-			int array_of_subsizes[4] = { RGCut<I>::partNodes(X, i),
+			int array_of_subsizes[4] = { 
+				RGCut<I>::partNodes(X, i),
 				RGCut<I>::partNodes(Y, j),
 				RGCut<I>::partNodes(Z, k),
 				nc };
@@ -294,6 +331,30 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 		0
 	};
 	viewType = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
+	// type for local DArrays
+	locArrayDt.resize(dac.numParts());
+	for (I k = 0; k != dac.numParts(Z); ++k)
+	for (I j = 0; j != dac.numParts(Y); ++j)
+	for (I i = 0; i != dac.numParts(X); ++i) {
+		// generate subArrayDt
+		int array_of_sizes[4] = { 
+			dac.numNodes(X), 
+			dac.numNodes(Y),
+			dac.numNodes(Z), 
+			nc };
+		int array_of_subsizes[4] = { 
+			dac.partNodes(X, i),
+			dac.partNodes(Y, j),
+			dac.partNodes(Z, k),
+			nc };
+		int array_of_starts[4] = { 
+			dac.partOrigin(X, i), 
+			dac.partOrigin(Y, j),
+			dac.partOrigin(Z, k),
+			0 };
+		locArrayDt.at(dac.linInd(i, j, k)) = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
+	}
+
 }
 
 template <typename T, typename I>
@@ -308,6 +369,7 @@ template<typename T, typename I>
 DArrayScatter<T, I>::~DArrayScatter() {
 	releaseSubarrayTypes(subArrayDt);
 	releaseSubarrayTypes(arrayDt);
+	releaseSubarrayTypes(locArrayDt);
 	if (viewType != MPI_DATATYPE_NULL) {
 		rgmpi::freeSubarrayType(viewType);
 	}

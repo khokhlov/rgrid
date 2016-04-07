@@ -38,3 +38,4 @@ echo "Running tests"
 ./test_darraycontainer
 ./test_clwrapper
 mpirun -np 12 ./test_darrayscatter
+mpirun -np 2 ./test_darrayscatter

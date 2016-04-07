@@ -128,7 +128,7 @@ template <> MPI_Datatype getMPItype<int>() { return MPI_INT; }
 template <> MPI_Datatype getMPItype<float>() { return MPI_FLOAT; } 
 template <> MPI_Datatype getMPItype<double>() { return MPI_DOUBLE; } 
 
-void freeSubarrayType(MPI_Datatype dt) {
+void freeSubarrayType(MPI_Datatype& dt) {
 	MPI_CHECK(MPI_Type_free(&dt));
 }
 

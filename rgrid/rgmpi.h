@@ -53,7 +53,7 @@ MPI_Datatype createSubarrayType(int gsize[4], int lsize[4], int start[4]) {
 	return dt;
 }
 
-void freeSubarrayType(MPI_Datatype dt);
+void freeSubarrayType(MPI_Datatype& dt);
 
 };
 #endif // USE_MPI

@@ -10,12 +10,10 @@ using namespace std;
 
 typedef rgrid::PDim<int> PDim;
 
-TEST_CASE(
-		"prim",
-		"creation"
-	 )
+TEST_CASE("pdim creation")
 {
 	PDim d;
+	d.resize(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 	REQUIRE(d.size() == 0);
 	REQUIRE(d.localSize() == 0);
 	REQUIRE(d.origin(rgrid::X) == 0);
@@ -23,10 +21,7 @@ TEST_CASE(
 	REQUIRE(d.origin(rgrid::Z) == 0);
 }
 
-TEST_CASE(
-		"prim",
-		"resize"
-	 )
+TEST_CASE("prim resize")
 {
 	PDim d;
 	d.resize(1, 2, 3);

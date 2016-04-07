@@ -6,10 +6,7 @@
 #include "rgrid/darraycontainer.h"
 #include "rgrid/rgio.h"
 
-TEST_CASE(
-		"DArrayContainer",
-		"splitAndCombine"
-	 )
+TEST_CASE("DArrayContainer splitAndCombine")
 {
 	rgrid::DArray<int, int> d1, d2;
 	d1.resize(100, 200, 150);
@@ -27,10 +24,7 @@ TEST_CASE(
 	REQUIRE(d1 == d2);
 }
 
-TEST_CASE(
-		"DArrayContainer",
-		"fillGhost"
-	 )
+TEST_CASE("DArrayContainer fillGhost")
 {
 	rgrid::DArray<int, int> d;
 	d.resize(30, 20, 10);

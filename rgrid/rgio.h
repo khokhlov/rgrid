@@ -2,10 +2,27 @@
 #define RG_IO_H
 
 #include <iostream>
-
 #include "rgrid/types.h"
 #include "rgrid/darray.h"
 #include "rgrid/darraycontainer.h"
+
+// TODO use another place for it
+namespace rgrid {
+namespace rgio {
+
+template <typename I>
+void writeHeader(std::iostream& stream, const I size[ALL_DIRS], const I components, const format fmt) {
+	stream << "# DARRAY DATA FORMAT" << std::endl;
+	stream << "SIZE: " << size[X] << " " << size[Y] << " " << size[Z] << std::endl;
+	stream << "COMPONENTS: " << components << std::endl;
+	stream << "FORMAT: ";
+	if (fmt == TEXT) stream << "text" << std::endl;
+	else if (fmt == BINARY) stream << "binary" << std::endl;
+}
+
+}
+}
+
 #include "rgrid/darrayscatter.h"
 
 namespace rgrid {
@@ -44,15 +61,15 @@ template <typename I>
 void writeHeader(std::iostream& stream, const I size[ALL_DIRS], const I components, const format fmt);
 
 #ifdef USE_MPI
-template <typename T, typename I>
-void saveDataBegin(const std::string filename, const DArrayScatter<T, I>& das, const format fmt, std::vector<MPI_Request>& requests);
-
-void saveDataEnd(std::vector<MPI_Request>& requests);
-
-template <typename T, typename I>
-void loadDataBegin(const std::string filename, DArrayScatter<T, I>& das, std::vector<MPI_Request>& requests);
-
-void loadDataEnd(std::vector<MPI_Request>& requests);
+//template <typename T, typename I>
+//void saveDataBegin(const std::string filename, DArrayScatter<T, I>& das, const format fmt, std::vector<MPI_Request>& requests);
+//
+//void saveDataEnd(std::vector<MPI_Request>& requests);
+//
+//template <typename T, typename I>
+//void loadDataBegin(const std::string filename, DArrayScatter<T, I>& das, std::vector<MPI_Request>& requests);
+//
+//void loadDataEnd(std::vector<MPI_Request>& requests);
 #endif // USE_MPI
 
 /* Start of implementations */
@@ -81,7 +98,7 @@ void saveData(std::iostream& stream, const DArrayContainer<T, I>& dArrayContaine
 
 #ifdef USE_MPI
 template <typename T, typename I>
-void saveDataBegin(const std::string filename, const DArrayScatter<T, I>& das, const format fmt, std::vector<MPI_Request>& requests) {
+void saveDataBegin(const std::string filename, DArrayScatter<T, I>& das, const format fmt, std::vector<MPI_Request>& requests) {
 	MPI_File fh;
 	std::stringstream ss;
 	I size[ALL_DIRS] = { das.numNodes(X), das.numNodes(Y), das.numNodes(Z) };
@@ -99,7 +116,7 @@ void saveDataBegin(const std::string filename, const DArrayScatter<T, I>& das, c
 	MPI_CHECK(MPI_File_set_view(fh, header.size() * sizeof(char), rgmpi::getMPItype<T>(), das.fileViewType(), "native", MPI_INFO_NULL));
 	MPI_Request req;
 	requests.clear();
-	requests.reserve(das.numParts);
+	requests.reserve(das.numParts());
 	for (I k = 0; k != das.numParts(Z); ++k)
 	for (I j = 0; j != das.numParts(Y); ++j)
 	for (I i = 0; i != das.numParts(X); ++i) {
@@ -214,15 +231,7 @@ format loadHeader(std::iostream& stream, I size[ALL_DIRS], I& components) {
 	return ret;
 }
 
-template <typename I>
-void writeHeader(std::iostream& stream, const I size[ALL_DIRS], const I components, const format fmt) {
-	stream << "# DARRAY DATA FORMAT" << std::endl;
-	stream << "SIZE: " << size[X] << " " << size[Y] << " " << size[Z] << std::endl;
-	stream << "COMPONENTS: " << components << std::endl;
-	stream << "FORMAT: ";
-	if (fmt == TEXT) stream << "text" << std::endl;
-	else if (fmt == BINARY) stream << "binary" << std::endl;
-}
+
 
 } // namespace rgio
 

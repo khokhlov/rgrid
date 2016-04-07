@@ -10,10 +10,7 @@ using namespace std;
 
 typedef rgrid::DArray<int, int> DArray;
 
-TEST_CASE(
-		"DArray",
-		"alloc"
-	 )
+TEST_CASE("DArray alloc")
 {
 	DArray d;
 	REQUIRE(d.size() == 0);
@@ -25,10 +22,7 @@ TEST_CASE(
 	REQUIRE(d.dataSize() == d.localSizeGhost());
 }
 
-TEST_CASE(
-		"DArray",
-		"fill"
-	 )
+TEST_CASE("DArray fill")
 {
 	DArray d;
 	d.resize(2, 2, 3);
@@ -43,48 +37,39 @@ TEST_CASE(
 	REQUIRE(ok);
 }
 
-TEST_CASE(
-		"DArray",
-		"fillGhost1"
-	 )
+TEST_CASE("DArray fillGhost", "fillGhost1")
 {
-	DArray d;
-	d.resize(10);
-	d.alloc();
-	d.fill(1);
-	d(0, 0) = 2;
-	d(9, 0) = 3;
-	d.fillGhost(rgrid::X);
-	REQUIRE(d(-1, 0) == 2);
-	REQUIRE(d(-2, 0) == 2);
-	REQUIRE(d(10, 0) == 3);
-	REQUIRE(d(11, 0) == 3);
+	SECTION("resize 1") {
+		DArray d;
+		d.resize(10);
+		d.alloc();
+		d.fill(1);
+		d(0, 0) = 2;
+		d(9, 0) = 3;
+		d.fillGhost(rgrid::X);
+		REQUIRE(d(-1, 0) == 2);
+		REQUIRE(d(-2, 0) == 2);
+		REQUIRE(d(10, 0) == 3);
+		REQUIRE(d(11, 0) == 3);
+	}
+	SECTION("resize 2") {
+		DArray d;
+		d.resize(10, 1, 1, 3, 0, 0);
+		d.alloc();
+		d.fill(1);
+		d(0, 0) = 2;
+		d(9, 0) = 3;
+		d.fillGhost(rgrid::X);
+		REQUIRE(d(-1, 0) == 2);
+		REQUIRE(d(-2, 0) == 2);
+		REQUIRE(d(-3, 0) == 2);
+		REQUIRE(d(10, 0) == 3);
+		REQUIRE(d(11, 0) == 3);
+		REQUIRE(d(12, 0) == 3);
+	}
 }
 
-TEST_CASE(
-		"DArray",
-		"fillGhost2"
-	 )
-{
-	DArray d;
-	d.resize(10, 1, 1, 3, 0, 0);
-	d.alloc();
-	d.fill(1);
-	d(0, 0) = 2;
-	d(9, 0) = 3;
-	d.fillGhost(rgrid::X);
-	REQUIRE(d(-1, 0) == 2);
-	REQUIRE(d(-2, 0) == 2);
-	REQUIRE(d(-3, 0) == 2);
-	REQUIRE(d(10, 0) == 3);
-	REQUIRE(d(11, 0) == 3);
-	REQUIRE(d(12, 0) == 3);
-}
-
-TEST_CASE(
-		"DArray",
-		"components"
-	 )
+TEST_CASE("DArray components")
 {
 	DArray d;
 	d.resize(2, 3, 4);
