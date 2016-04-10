@@ -7,283 +7,130 @@
 
 #include "rgrid/types.h"
 #include "rgrid/utils.h"
-
-
+#include "rgrid/pdimraw.h"
 
 namespace rgrid {
+
 template <typename T>
-struct PDim {
-	void resize(const PDim &p);
-	void resize(const T &x, const T &y, const T&z,
-				const T &px, const T &py, const T &pz,
-				const T &ox, const T &oy, const T &oz,
-				const T &gx, const T &gy, const T &gz);
-	void resize(const T &x, const T &y, const T &z);
-	void resize(const T &x, const T &y, const T &z, const T &gx, const T &gy, const T &gz);
-	void resize(const T &x, const T &y) { resize(x, y, static_cast<T>(1)); }
-	void resize(const T &x) { resize(x, static_cast<T>(1)); }
-	void resize_d(const CartDir &d1, const T &s1, const CartDir &d2, const T &s2, const CartDir &d3, const T &s3);
+struct PDim : public PDimRaw<T> {
+	virtual void resize(const T x, const T y, const T z,
+	                    const T px, const T py, const T pz,
+	                    const T ox, const T oy, const T oz,
+	                    const T gx, const T gy, const T gz,
+	                    const T cn);
+	virtual void resize(const PDim<T> &p);
+	virtual void resize(const T x, const T y, const T z, const T cn);
+	virtual void resize(const T x, const T y, const T z,
+	                    const T gx, const T gy, const T gz,
+	                    const T cn);
+	virtual void resize_d(const CartDir d1, const T s1, const CartDir d2, const T s2, const CartDir d3, const T s3, const T cn);
 
-	T ind(const T &x, const T &y, const T &z) const;
-	T ind(const T &x, const T &y) const { return ind(x, y, static_cast<T>(0)); }
-	T ind(const T &x) const { return ind(x, static_cast<T>(0)); }
+	const static T s_ghost_size = 2;
 
-	T ind(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3) const;
-	T ind(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2) const { return ind(i1, d1, i2, d2, static_cast<T>(0), Z); }
-	T ind(const T &i1, const CartDir &d1) const { return ind(i1, d1, static_cast<T>(0), Y); }
-
-	T ghost(const CartDir &d) const { return ghost_size[d]; }
-	T ghost() const { return ghost(X); }
-
-	T size(const CartDir &d) const { return all_ext[d]; }
-	T size() const { return all_size; }
-
-	T localSize(const CartDir &d) const { return local_ext[d]; }
-	T localSize() const { return local_size; }
-
-	T origin(const CartDir &d) const { return o[d]; }
-	T origin() const { return origin(X); }
-
-	T localSizeGhost(const CartDir &d) const { return local_ghost_ext[d]; }
-	T localSizeGhost() const { return local_ghost_size; }
-	T stride(const CartDir &d) const { return local_stride[d]; }
-
-	T localToIJK(const T &index, const CartDir &dir);
-	T indNoGhost(const T &x, const T &y, const T &z);
-
-	T localToGlobal(const T &index, const CartDir &dir);
-	T localFromGlobal(const T &x, const T &y, const T &z);
-	T localFromGlobal(const T &x, const T &y) { return localFromGlobal(x, y, static_cast<T>(0)); }
-	T localFromGlobal(const T &x) { return localFromGlobal(x, static_cast<T>(0)); }
-
-	T indGlobal(const T &x, const T &y, const T &z) { return localFromGlobal(x, y, z); }
-	T indGlobal(const T &x, const T &y) { return localFromGlobal(x, y); }
-	T indGlobal(const T &x) { return localFromGlobal(x); }
-
-	bool check(const T &index, const CartDir &dir);
-	bool check(const T &i) { return check(i, X); }
-	bool check(const T &i, const T &j) { return check(i, X) && check(j, Y); }
-	bool check(const T &i, const T &j, const T &k) { return check(i, X) && check(j, Y) && check(k, Z); }
-	bool checkg(const T &index, const CartDir &dir);
-	bool checkg(const T &i) { return checkg(i, X); }
-	bool checkg(const T &i, const T &j) { return checkg(i, X) && checkg(j, Y); }
-	bool checkg(const T &i, const T &j, const T &k) { return checkg(i, X) && checkg(j, Y) && checkg(k, Z); }
-
-	bool isCorner(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3);
-	bool isEdge(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3);
-	bool isGhost(const T &i, const T &j, const T &k);
-	bool isGhost(const T &i, const T &j) { return isGhost(i, j, static_cast<T>(0)); }
-	bool isGhost(const T &i) { return isGhost(i, static_cast<T>(0)); }
-	bool isOnFace(const CartDir &d, const CartSide &s);
-
-	CartDim dim() const;
-
-	const static T GHOST_SIZE = 2;
-	T all_ext[ALL_DIRS];
-	T all_size;
-	T all_stride[ALL_DIRS];
-
-	T local_ext[ALL_DIRS];
-	T local_size;
-	T local_stride[ALL_DIRS];
-
-	T ghost_size[ALL_DIRS];
-	// size with ghost
-	T local_ghost_ext[ALL_DIRS];
-	// all grid size with ghost
-	T local_ghost_size;
-
-	T o[ALL_DIRS];
+	PDim(): PDimRaw<T>() {
+	}
+	
+	PDim(const T x, const T y = 1, const T z = 1, const T cn = 1) : PDimRaw<T>() {
+		resize(x, y, z, x, y, z, 0, 0, 0, 0, 0, 0, cn);
+	}
+	PDim(const T x, const T y, const T z,
+	     const T px, const T py, const T pz,
+	     const T ox, const T oy, const T oz,
+	     const T gx, const T gy, const T gz,
+	     const T cn) : PDimRaw<T>() {
+		resize(x, y, z, px, py, pz, ox, oy, oz, gx, gy, gz, cn);
+	}
+	PDim(const PDim<T> &rhs) : PDimRaw<T>()  {
+		resize(rhs);
+	}
+	PDim<T> &operator=(const PDim<T> &rhs) {
+		resize(rhs);
+		return *this;
+	}
+	
+	virtual ~PDim() {}
 }; // PDim
 
 template <typename T>
-CartDim PDim<T>::dim() const
-{
-	CartDim d = DIM_3D;
-	if (size(Z) == 1) d = DIM_2D;
-	if (size(Y) == 1) d = DIM_1D;
-	return d;
+void PDim<T>::resize_d(const CartDir d1, const T s1, const CartDir d2, const T s2, const CartDir d3, const T s3, const T cn) {
+	PDimRaw<T>::m_global_size[d1] = s1;
+	PDimRaw<T>::m_global_size[d2] = s2;
+	PDimRaw<T>::m_global_size[d3] = s3;
+	resize(PDimRaw<T>::m_global_size[X], PDimRaw<T>::m_global_size[Y], PDimRaw<T>::m_global_size[Z], cn);
 }
 
 template <typename T>
-bool PDim<T>::isOnFace(const CartDir &d, const CartSide &s)
-{
-	bool ret = false;
-	if (s == SIDE_LEFT && origin(d) == 0) ret = true;
-	if (s == SIDE_RIGHT && origin(d) + localSize(d) == size(d)) ret = true;
-	return ret;
-}
-
-template <typename T>
-bool PDim<T>::isGhost(const T &i, const T &j, const T &k)
-{
-	return i < 0 || i >= localSize(X) || j < 0 || j >= localSize(Y) || k < 0 || k >= localSize(Z);
-}
-
-template <typename T>
-bool operator==(const PDim<T>& lhs, const PDim<T>& rhs) {
-	bool is1 = (lhs.all_ext[X] == rhs.all_ext[X]) && (lhs.all_ext[Y] == rhs.all_ext[Y]) && (lhs.all_ext[Z] == rhs.all_ext[Z]);
-	bool is2 = (lhs.local_ext[X] == rhs.local_ext[X]) && (lhs.local_ext[Y] == rhs.local_ext[Y]) && (lhs.local_ext[Z] == rhs.local_ext[Z]);
-	bool is3 = (lhs.ghost_size[X] == rhs.ghost_size[X]) && (lhs.ghost_size[Y] == rhs.ghost_size[Y]) && (lhs.ghost_size[Z] == rhs.ghost_size[Z]);
-	bool is4 = (lhs.o[X] == rhs.o[X]) && (lhs.o[Y] == rhs.o[Y]) && (lhs.o[Z] == rhs.o[Z]);
-	return is1 && is2 && is3 && is4;
-}
-
-template <typename T>
-bool operator!=(const PDim<T>& lhs, const PDim<T>& rhs) {
-	return !(lhs == rhs);
-}
-
-template <typename T>
-bool PDim<T>::isCorner(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3)
-{
-	bool a = (localToGlobal(i1, d1) == static_cast<T>(0)) || (localToGlobal(i1, d1) == all_ext[d1] - 1);
-	bool b = (localToGlobal(i2, d2) == static_cast<T>(0)) || (localToGlobal(i2, d2) == all_ext[d2] - 1);
-	bool c = (localToGlobal(i3, d3) == static_cast<T>(0)) || (localToGlobal(i3, d3) == all_ext[d3] - 1);
-	return a && b && c;
-}
-
-template <typename T>
-bool PDim<T>::isEdge(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3)
-{
-	bool a = (localToGlobal(i1, d1) == static_cast<T>(0)) || (localToGlobal(i1, d1) == all_ext[d1] - 1);
-	bool b = (localToGlobal(i2, d2) == static_cast<T>(0)) || (localToGlobal(i2, d2) == all_ext[d2] - 1);
-	bool c = (localToGlobal(i3, d3) == static_cast<T>(0)) || (localToGlobal(i3, d3) == all_ext[d3] - 1);
-	return (a && b) || (b && c) || (c && a);
-}
-
-template <typename T>
-bool PDim<T>::check(const T& index, const CartDir& dir)
-{
-	return index >= o[dir] && index < o[dir] + local_ext[dir];
-}
-
-template <typename T>
-bool PDim<T>::checkg(const T& index, const CartDir& dir)
-{
-	return index >= -ghost_size[dir] + o[dir] && index < o[dir] + local_ext[dir] + ghost_size[dir];
-}
-
-
-template <typename T>
-T PDim<T>::localToGlobal(const T& index, const CartDir& dir)
-{
-	return index + o[dir];
-}
-
-template <typename T>
-T PDim<T>::indNoGhost(const T& x, const T& y, const T& z)
-{
-	return x + y * local_ext[X] + z * local_ext[X] * local_ext[Y];
-}
-
-template <typename T>
-T PDim<T>::localFromGlobal(const T& x, const T& y, const T& z)
-{
-	return ind(x - o[X], y - o[Y], z - o[Z]);
-}
-
-
-template <typename T>
-T PDim<T>::ind(const T& x, const T& y, const T& z) const
-{
-	return x + ghost_size[X] + (y + ghost_size[Y]) * local_stride[Y] + (z + ghost_size[Z]) * local_stride[Z];
-}
-
-template <typename T>
-T PDim<T>::ind(const T &i1, const CartDir &d1, const T &i2, const CartDir &d2, const T &i3, const CartDir &d3) const
-{
-	return (i1 + ghost_size[d1]) * local_stride[d1] + (i2 + ghost_size[d2]) * local_stride[d2] + (i3 + ghost_size[d3]) * local_stride[d3];
-}
-
-template <typename T>
-void PDim<T>::resize_d(const CartDir &d1, const T &s1, const CartDir &d2, const T &s2, const CartDir &d3, const T &s3)
-{
-	all_ext[d1] = s1;
-	all_ext[d2] = s2;
-	all_ext[d3] = s3;
-	resize(all_ext[X], all_ext[Y], all_ext[Z]);
-}
-
-template <typename T>
-void PDim<T>::resize(const T &x, const T &y, const T &z, const T &gx, const T &gy, const T &gz)
-{
+void PDim<T>::resize(const T x, const T y, const T z, const T gx, const T gy, const T gz, const T cn) {
 	resize(x, y, z,
 	       x, y, z,
 	       0, 0, 0,
-	       gx, gy, gz);
+	       gx, gy, gz,
+	       cn);
 }
 
 template <typename T>
-void PDim<T>::resize(const T &x, const T &y, const T &z)
-{
+void PDim<T>::resize(const T x, const T y, const T z, const T cn) {
 	resize(x, y, z,
-	       x > 1 ? GHOST_SIZE : 0, y > 1 ? GHOST_SIZE : 0, z > 1 ? GHOST_SIZE : 0);
+	       x > 1 ? s_ghost_size : 0,
+	       y > 1 ? s_ghost_size : 0,
+	       z > 1 ? s_ghost_size : 0,
+	       cn);
 }
 
 template <typename T>
-void PDim<T>::resize(const PDim<T> &p)
-{
-	resize(p.all_ext[X], p.all_ext[Y], p.all_ext[Z],
-	       p.local_ext[X], p.local_ext[Y], p.local_ext[Z],
-	       p.o[X], p.o[Y], p.o[Z],
-	       p.ghost_size[X], p.ghost_size[Y], p.ghost_size[Z]
-	);
+void PDim<T>::resize(const PDim<T> &p) {
+	resize(p.m_global_size[X], p.m_global_size[Y], p.m_global_size[Z],
+	       p.m_local_size[X], p.m_local_size[Y], p.m_local_size[Z],
+	       p.m_origin[X], p.m_origin[Y], p.m_origin[Z],
+	       p.m_ghost_size[X], p.m_ghost_size[Y], p.m_ghost_size[Z],
+	       p.m_nc);
 }
 
 
 template <typename T>
-void PDim<T>::resize(const T& x, const T& y, const T& z, const T& px, const T& py, const T& pz, const T& ox, const T& oy, const T& oz, const T& gx, const T& gy, const T& gz)
-{
+void PDim<T>::resize(const T x, const T y, const T z, const T px, const T py, const T pz, const T ox, const T oy, const T oz, const T gx, const T gy, const T gz, const T cn) {
 	// Set base variables.
-	all_ext[X] = x;
-	all_ext[Y] = y;
-	all_ext[Z] = z;
+	PDimRaw<T>::m_global_size[X] = x;
+	PDimRaw<T>::m_global_size[Y] = y;
+	PDimRaw<T>::m_global_size[Z] = z;
 
-	local_ext[X] = px;
-	local_ext[Y] = py;
-	local_ext[Z] = pz;
+	PDimRaw<T>::m_local_size[X] = px;
+	PDimRaw<T>::m_local_size[Y] = py;
+	PDimRaw<T>::m_local_size[Z] = pz;
 
-	o[X] = ox;
-	o[Y] = oy;
-	o[Z] = oz;
+	PDimRaw<T>::m_origin[X] = ox;
+	PDimRaw<T>::m_origin[Y] = oy;
+	PDimRaw<T>::m_origin[Z] = oz;
 
-	ghost_size[X] = gx;
-	ghost_size[Y] = gy;
-	ghost_size[Z] = gz;
+	PDimRaw<T>::m_ghost_size[X] = gx;
+	PDimRaw<T>::m_ghost_size[Y] = gy;
+	PDimRaw<T>::m_ghost_size[Z] = gz;
+
+	PDimRaw<T>::m_nc = cn;
 
 	// Calculate auxilary variables.
-	all_size = all_ext[X] * all_ext[Y] * all_ext[Z];
+	PDimRaw<T>::m_global_size_all = PDimRaw<T>::m_global_size[X] * PDimRaw<T>::m_global_size[Y] * PDimRaw<T>::m_global_size[Z];
 
-	all_stride[X] = 1;
-	all_stride[Y] = all_ext[X];
-	all_stride[Z] = all_ext[X] * all_ext[Y];
+	PDimRaw<T>::m_global_stride[X] = 1;
+	PDimRaw<T>::m_global_stride[Y] = PDimRaw<T>::m_global_size[X];
+	PDimRaw<T>::m_global_stride[Z] = PDimRaw<T>::m_global_size[X] * PDimRaw<T>::m_global_size[Y];
 
-	local_size = local_ext[X] * local_ext[Y] * local_ext[Z];
+	PDimRaw<T>::m_local_size_all = PDimRaw<T>::m_local_size[X] * PDimRaw<T>::m_local_size[Y] * PDimRaw<T>::m_local_size[Z];
 
-	local_ghost_ext[X] = local_ext[X] + ghost_size[X] * 2;
-	local_ghost_ext[Y] = local_ext[Y] + ghost_size[Y] * 2;
-	local_ghost_ext[Z] = local_ext[Z] + ghost_size[Z] * 2;
+	PDimRaw<T>::m_local_ghost_size[X] = PDimRaw<T>::m_local_size[X] + PDimRaw<T>::m_ghost_size[X] * 2;
+	PDimRaw<T>::m_local_ghost_size[Y] = PDimRaw<T>::m_local_size[Y] + PDimRaw<T>::m_ghost_size[Y] * 2;
+	PDimRaw<T>::m_local_ghost_size[Z] = PDimRaw<T>::m_local_size[Z] + PDimRaw<T>::m_ghost_size[Z] * 2;
 
-	local_ghost_size = local_ghost_ext[X] * local_ghost_ext[Y] * local_ghost_ext[Z];
+	PDimRaw<T>::m_local_ghost_size_all = PDimRaw<T>::m_local_ghost_size[X] * PDimRaw<T>::m_local_ghost_size[Y] * PDimRaw<T>::m_local_ghost_size[Z];
 
-	local_stride[X] = 1;
-	local_stride[Y] = local_ghost_ext[X];
-	local_stride[Z] = local_ghost_ext[X] * local_ghost_ext[Y];
-}
-
-template <typename T>
-T PDim<T>::localToIJK(const T& index, const CartDir& dir)
-{
-	T k = index / local_stride[Z] - ghost(Z);
-	T j = (index - (k + ghost(Z)) * local_stride[Z]) / local_stride[Y] - ghost(Y);
-	T i = (index - (k + ghost(Z)) * local_stride[Z] - (j + ghost(Y)) * local_stride[Y]) / local_stride[X] - ghost(X);
-	if (dir == Z) return k;
-	else if (dir == Y) return j;
-	else if (dir == X) return i;
-	return -1;
+	PDimRaw<T>::m_local_stride[X] = 1;
+	PDimRaw<T>::m_local_stride[Y] = PDimRaw<T>::m_local_ghost_size[X];
+	PDimRaw<T>::m_local_stride[Z] = PDimRaw<T>::m_local_ghost_size[X] * PDimRaw<T>::m_local_ghost_size[Y];
 }
 
 }; // rgrid
 
 #endif // RGRID_PDIM_H
+
+
+

@@ -105,6 +105,27 @@ public:
 	I partNodes(const CartDir dir, const I partNum) const {
 		return partNum < iml[dir] ? ml[dir] + 1 : ml[dir];
 	}
+
+	RGCut(const RGCut<I>& rhs) {
+		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d+1)) {
+			parts[d] = rhs.parts[d];
+			size[d] = rhs.size[d];
+			ml[d] = rhs.ml[d];
+			iml[d] = rhs.iml[d];
+		}
+		allParts = rhs.allParts;
+	}
+	
+	RGCut<I>& operator=(const RGCut<I>& rhs) {
+		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d+1)) {
+			parts[d] = rhs.parts[d];
+			size[d] = rhs.size[d];
+			ml[d] = rhs.ml[d];
+			iml[d] = rhs.iml[d];
+		}
+		allParts = rhs.allParts;
+		return *this;
+	}
 private:
 	/* number of parts in each direction */
 	I parts[ALL_DIRS];

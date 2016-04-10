@@ -28,8 +28,35 @@ enum CartDim {
 	DIM_ALL
 };
 
+template <typename T>
+struct Dim3D {
+	T x, y, z;
+	Dim3D(T i /*= T()*/, T j /*= T()*/, T k /*= T()*/)
+		: x(i), y(j), z(k) {
+	}
+	Dim3D() {
+		
+	}
+	T &operator[](const CartDir d) {
+		return (d == X) ? x : ((d == Y) ? y : z);
+	}
+	T operator[](const CartDir d) const {
+		return (d == X) ? x : ((d == Y) ? y : z);
+	}
+};
+
+template <typename T>
+bool operator==(const Dim3D<T>& lhs, const Dim3D<T>& rhs) {
+	return lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
+}
+
+template <typename T>
+bool operator!=(const Dim3D<T>& lhs, const Dim3D<T>& rhs) {
+	return !(lhs == rhs);
+}
+
 namespace rgio {
-	
+
 enum format { BINARY, TEXT };
 
 } // namespace rgio

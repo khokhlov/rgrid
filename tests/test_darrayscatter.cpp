@@ -1,4 +1,4 @@
-// prowide main
+// provide main
 #define CATCH_CONFIG_RUNNER
 // provide cout, cerr
 #define CATCH_CONFIG_NOSTDOUT
@@ -15,14 +15,22 @@
 namespace Catch {
 	std::ostringstream emptyoss;
 	std::ostream& cout() {
-		if (rgmpi::worldRank() == 0) {
+		int rank = 0;
+#ifdef USE_MPI		
+		rank = rgmpi::worldRank();
+#endif
+		if (rank == 0) {
 			return std::cout;
 		} else {
 			return emptyoss;
 		}
 	}
 	std::ostream& cerr() {
-		if (rgmpi::worldRank() == 0) {
+		int rank = 0;
+#ifdef USE_MPI		
+		rank = rgmpi::worldRank();
+#endif
+		if (rank == 0) {
 			return std::cerr;
 		} else {
 			return emptyoss;
@@ -32,11 +40,15 @@ namespace Catch {
 
 int main(int argc, char** argv)
 {
+#ifdef USE_MPI
 	rgmpi::init(&argc, &argv);
+#endif
 	
 	int result = Catch::Session().run(argc, argv);
 	
+#ifdef USE_MPI
 	rgmpi::forceFinalize();
+#endif
 	
 	return result;
 }
@@ -56,8 +68,7 @@ TEST_CASE("DArrayScatter scatter and gather")
 		
 		if (das.getInternalRank() == 0) {
 			rgrid::DArray<int, int> d1, d2;
-			d1.resize(100, 200, 150);
-			d1.alloc(3);
+			d1.resize(100, 200, 150, 3);
 			d1.fill(2);
 			d1(3, 3, 3, 0) = 7;
 			d1(3, 3, 3, 1) = 8;
@@ -73,37 +84,118 @@ TEST_CASE("DArrayScatter scatter and gather")
 	}
 }
 
-TEST_CASE("DArrayScatter input/output") {	
+TEST_CASE("DArrayScatter IO 1") {	
+	if (rgmpi::worldSize() == 1 * 1 * 1) {
+	
+		rgrid::DArrayScatter<int, int> das;
+		int const size[3] = { 3, 1, 5 };
+		int const gp[3] = { 1, 1, 1 };
+		int const lp[3] = { 2, 1, 2 };
+		int const ghost[3] = { 0, 0, 0 };
+		das.setSizes(size, gp, lp, ghost, 2);
+		
+		if (das.getInternalRank() == 0) {
+			rgrid::DArray<int, int> d1, d2;
+			d1.resize(3, 1, 5, 3, 1, 5, 0, 0, 0, 0, 0, 0, 2);
+			d1.fill(2);
+			d1(0, 0, 0, 0) = 7;
+			d1(2, 0, 1, 0) = 3;
+			d1(2, 0, 1, 1) = 5;
+			d1.fillGhost();
+			das.setAndScatter(0, d1);
+			das.saveDataBegin("test_das_io_simple_1.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			das.gatherAndGet(0, d1);
+			std::fstream fs;
+			fs.open("test_das_io_simple_2.txt", std::ios_base::out);
+			d1.saveData(fs, rgrid::rgio::BINARY);
+			fs.close();
+			fs.open("test_das_io_simple_1.txt", std::ios_base::in);
+			d2.loadData(fs);
+			fs.close();
+			REQUIRE(d1 == d2);
+		} else {
+			rgrid::DArray<int, int> d1, d2;
+			das.setAndScatter(0, d1);
+			das.saveDataBegin("test_das_io_simple_1.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			das.gatherAndGet(0, d2);
+		}
+	}
+}
+
+TEST_CASE("DArrayScatter IO 2") {	
 	if (rgmpi::worldSize() == 2 * 1 * 1) {
 	
 		rgrid::DArrayScatter<int, int> das;
 		int const size[3] = { 4, 1, 1 };
 		int const gp[3] = { 2, 1, 1 };
-		int const lp[3] = { 1, 1, 1 };
-		int const ghost[3] = { 0, 0, 0 };
+		int const lp[3] = { 2, 1, 1 };
+		int const ghost[3] = { 0, 1, 0 };
 		das.setSizes(size, gp, lp, ghost, 1);
 		
 		if (das.getInternalRank() == 0) {
 			rgrid::DArray<int, int> d1, d2;
-			d1.resize(4, 1, 1, 4, 1, 1, 0, 0, 0, 0, 0, 0);
-			d1.alloc(1);
+			d1.resize(4, 1, 1, 4, 1, 1, 0, 0, 0, 0, 1, 0, 1);
 			d1.fill(2);
 			d1(0, 0, 0, 0) = 7;
-			d1(3, 0, 0, 0) = 8;
+			d1(3, 0, 0, 0) = 3;
 			d1.fillGhost();
 			das.setAndScatter(0, d1);
-			das.saveDataBegin("test1.txt", rgrid::rgio::BINARY);
+			das.saveDataBegin("test_das_io_1.txt", rgrid::rgio::BINARY);
 			das.saveDataEnd();
-			das.gatherAndGet(0, d2);
-			REQUIRE(d1 == d2);
+			das.gatherAndGet(0, d1);
 			std::fstream fs;
-			fs.open("test2.txt", std::ios_base::out);
-			rgrid::rgio::saveData(fs, d2, rgrid::rgio::BINARY);
+			fs.open("test_das_io_2.txt", std::ios_base::out);
+			d1.saveData(fs, rgrid::rgio::BINARY);
 			fs.close();
+			fs.open("test_das_io_1.txt", std::ios_base::in);
+			d2.loadData(fs);
+			fs.close();
+			REQUIRE(d1 == d2);
 		} else {
 			rgrid::DArray<int, int> d1, d2;
 			das.setAndScatter(0, d1);
-			das.saveDataBegin("test.txt", rgrid::rgio::BINARY);
+			das.saveDataBegin("test_das_io_1.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			das.gatherAndGet(0, d2);
+		}
+	}
+}
+
+TEST_CASE("DArrayScatter IO 3") {	
+	if (rgmpi::worldSize() == 3 * 4 * 5) {
+	
+		rgrid::DArrayScatter<int, int> das;
+		int const size[3] = { 17, 50, 6 };
+		int const gp[3] = { 3, 4, 5 };
+		int const lp[3] = { 2, 1, 1 };
+		int const ghost[3] = { 3, 0, 1 };
+		das.setSizes(size, gp, lp, ghost, 2);
+		
+		if (das.getInternalRank() == 0) {
+			rgrid::DArray<int, int> d1, d2;
+			d1.resize(17, 50, 6, 17, 50, 6, 0, 0, 0, 3, 0, 1, 2);
+			d1.fill(4);
+			d1(12, 23, 0, 0) = 7;
+			d1(3, 3, 5, 1) = 3;
+			d1.fillGhost();
+			das.setAndScatter(0, d1);
+			das.saveDataBegin("test_das_io3_1.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			das.gatherAndGet(0, d1);
+			std::fstream fs;
+			fs.open("test_das_io3_2.txt", std::ios_base::out);
+			d1.saveData(fs, rgrid::rgio::BINARY);
+			fs.close();
+			fs.open("test_das_io3_1.txt", std::ios_base::in);
+			d2.loadData(fs);
+			fs.close();
+			REQUIRE(d1 == d2);
+		} else {
+			rgrid::DArray<int, int> d1, d2;
+			das.setAndScatter(0, d1);
+			das.saveDataBegin("test_das_io3_1.txt", rgrid::rgio::BINARY);
 			das.saveDataEnd();
 			das.gatherAndGet(0, d2);
 		}

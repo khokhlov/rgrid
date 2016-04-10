@@ -28,11 +28,9 @@ TEST_CASE("CLWrapper oneDeviceDArray")
 	if (clw.getPlatformsNum() != 0) {
 		if (clw.getDevicesNum() != 0) {
 			rgrid::DArray<int, int> da, da2;
-			da.resize(100, 200, 150);
-			da.alloc(3);
+			da.resize(100, 200, 150, 3);
 			da.fill(7);
-			da2.resize(100, 200, 150);
-			da2.alloc(3);
+			da2.resize(100, 200, 150, 3);
 			da2.fill(17);
 			
 			da.setCLContext(clw.getContext());
@@ -50,7 +48,7 @@ TEST_CASE("CLWrapper oneDeviceDArray")
 			cl_kernel kernelAdd10 = clCreateKernel(program, "add10", &err);
 			CHECK_CL_ERROR(err);
 			
-			int size[3] = {da.localSizeGhost(rgrid::X), da.localSizeGhost(rgrid::Y), da.localSizeGhost(rgrid::Z)};
+			int size[3] = {da.localGhostSize(rgrid::X), da.localGhostSize(rgrid::Y), da.localGhostSize(rgrid::Z)};
 			int nc = da.getNC();
 			CHECK_CL_ERROR(clSetKernelArg(kernelAdd10, 0, sizeof(size[0]), &size[0]));
 			CHECK_CL_ERROR(clSetKernelArg(kernelAdd10, 1, sizeof(size[1]), &size[1]));
@@ -91,8 +89,8 @@ TEST_CASE("CLWrapper DArrayFillGhostCL")
 			da.resize(1, 1, 1, 
 			          1, 1, 1, 
 			          0, 0, 0, 
-			          2, 3, 4);
-			da.alloc(5);
+			          2, 3, 4,
+					  5);
 			da.fill(4);
 			da.val(0, 0, 0, 0) = 2;
 			da.val(0, 0, 0, 3) = 7;
@@ -122,8 +120,7 @@ TEST_CASE("CLWrapper DArrayContainerFillGhostCL")
 	if (clw.getPlatformsNum() != 0) {
 		if (clw.getDevicesNum() != 0) {
 			rgrid::DArray<int, int> da;
-			da.resize(30, 10, 30);
-			da.alloc(3);
+			da.resize(30, 10, 30, 3);
 			da.fill(7);
 			
 			rgrid::DArrayContainer<int, int> dac(da, 2, 3, 2);
@@ -141,7 +138,7 @@ TEST_CASE("CLWrapper DArrayContainerFillGhostCL")
 				CHECK_CL_ERROR(err);
 				cl_kernel kernelAdd10 = clCreateKernel(program, "add10", &err);
 				CHECK_CL_ERROR(err);
-				int size[3] = {dap.localSizeGhost(rgrid::X), dap.localSizeGhost(rgrid::Y), dap.localSizeGhost(rgrid::Z)};
+				int size[3] = {dap.localGhostSize(rgrid::X), dap.localGhostSize(rgrid::Y), dap.localGhostSize(rgrid::Z)};
 				int nc = dap.getNC();
 				CHECK_CL_ERROR(clSetKernelArg(kernelAdd10, 0, sizeof(size[0]), &size[0]));
 				CHECK_CL_ERROR(clSetKernelArg(kernelAdd10, 1, sizeof(size[1]), &size[1]));

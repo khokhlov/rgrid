@@ -9,8 +9,7 @@
 TEST_CASE("DArrayContainer splitAndCombine")
 {
 	rgrid::DArray<int, int> d1, d2;
-	d1.resize(100, 200, 150);
-	d1.alloc(3);
+	d1.resize(100, 200, 150, 3);
 	d1.fill(2);
 	d1(3, 3, 3, 0) = 7;
 	d1(3, 3, 3, 1) = 8;
@@ -27,8 +26,7 @@ TEST_CASE("DArrayContainer splitAndCombine")
 TEST_CASE("DArrayContainer fillGhost")
 {
 	rgrid::DArray<int, int> d;
-	d.resize(30, 20, 10);
-	d.alloc(2);
+	d.resize(30, 20, 10, 2);
 	d.fill(3);
 	d.val(0, 0, 0, 0) = 5;
 	d.fillGhost(rgrid::Y, rgrid::SIDE_LEFT);
@@ -42,4 +40,19 @@ TEST_CASE("DArrayContainer fillGhost")
 	REQUIRE(dac.getDArrayPart(1, 0, 0).val(-1, 2, 3, 0) == 17);
 	REQUIRE(dac.getDArrayPart(0, 1, 0).val(5, -2, 3, 0) == 17);
 	REQUIRE(dac.getDArrayPart(0, 0, 1).val(5, 2, -1, 0) == 17);
+}
+
+TEST_CASE("rgio DArrayContainerInString")
+{
+	rgrid::DArray<int, int> d1, d2;
+	d1.resize(5, 10, 12, 3);
+	d1.fill(17);
+	d1(4, 7, 0, 0) = 4;
+	d1(4, 5, 0, 2) = 5;
+	d1.fillGhost();
+	rgrid::DArrayContainer<int, int> dac(d1, 2, 3, 3);
+	std::stringstream ss;
+	dac.saveData(ss, rgrid::rgio::BINARY);
+	d2.loadData(ss);
+	REQUIRE(d1 == d2);
 }
