@@ -34,7 +34,6 @@ make -j 4
 echo "Running tests"
 ./test_darray
 ./test_pdim
-./test_rgio
 ./test_darraycontainer
 ./test_clwrapper
 mpirun -np 12 ./test_darrayscatter

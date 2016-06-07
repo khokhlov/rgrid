@@ -10,10 +10,6 @@ aux_source_directory(rgrid/src RGRID)
 if(USE_MPI)
 set(CMAKE_CXX_COMPILER mpicxx)
 add_definitions(-DUSE_MPI)
-
-add_executable(test_darrayscatter tests/test_darrayscatter.cpp)
-target_link_libraries(test_darrayscatter rgrid ${EXTRA_LIBS})
-
 endif(USE_MPI)
 
 if(USE_OPENCL)
@@ -31,6 +27,8 @@ target_link_libraries(test_darray rgrid ${EXTRA_LIBS})
 add_executable(test_darraycontainer tests/test_darraycontainer.cpp)
 target_link_libraries(test_darraycontainer rgrid ${EXTRA_LIBS})
 
+add_executable(test_darrayscatter tests/test_darrayscatter.cpp)
+target_link_libraries(test_darrayscatter rgrid ${EXTRA_LIBS})
 
 add_executable(test_pdim tests/test_pdim.cpp)
 target_link_libraries(test_pdim rgrid ${EXTRA_LIBS})

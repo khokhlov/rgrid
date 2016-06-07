@@ -36,7 +36,7 @@ public:
 		PDim<I>::resize(x, y, z, px, py, pz, ox, oy, oz, gx, gy, gz, cn);
 		alloc();
 	}
-	virtual void resize(const PDim<T> &p) {
+	virtual void resize(const PDim<I> &p) {
 		PDim<I>::resize(p);
 		alloc();
 	}
