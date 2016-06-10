@@ -158,8 +158,11 @@ public:
 
 #ifdef USE_OPENCL
 public:
-	// the same as copy ghost, but it make copy on device
-	void copyGhostCL(DArray<T, I> &da, const CartDir &d, const CartSide &s);
+	/* make copy to ghost nodes of this DArray from DArray da
+	 * when both DArrays placed on device 
+	 * if event is NULL perform blocking copy, 
+	 * otherwise return event which user have to wait and perform asynchronous copy */
+	void copyGhostCL(DArray<T, I> &da, const CartDir &d, const CartSide &s, cl_event* event = NULL);
 
 	// the same as fill ghost, but working on device
 	void fillGhostCL(const CartDir &d, const CartSide &s);
@@ -175,7 +178,7 @@ public:
 	 * You must run setCLContext() and setCLCQ() before */
 	cl_mem &getCLBuffer();
 
-	/* Get second temporary buffer with the same size as first buffer to improve performaPDim<I>::getNC()e
+	/* Get second temporary buffer with the same size as first buffer to improve performaPDim<I>::getNC()
 	 * You must run setCLContext() and setCLCQ() before */
 	cl_mem &getCLBuffer2();
 
@@ -427,7 +430,7 @@ void DArray<T, I>::clDtoH() {
 }
 
 template <typename T, typename I>
-void DArray<T, I>::copyGhostCL(DArray<T, I> &da, const CartDir &d, const CartSide &s) {
+void DArray<T, I>::copyGhostCL(DArray<T, I> &da, const CartDir &d, const CartSide &s, cl_event* event) {
 	size_t origFrom[ALL_DIRS], origTo[ALL_DIRS];
 	size_t origHost[ALL_DIRS] = { 0, 0, 0 };
 	size_t region[ALL_DIRS];
@@ -440,7 +443,7 @@ void DArray<T, I>::copyGhostCL(DArray<T, I> &da, const CartDir &d, const CartSid
 	region[ort2] = da.localSize(ort2);
 	if (s == SIDE_LEFT) {
 		origTo[d] = 0;
-		origFrom[d] = (PDim<I>::localGhostSize(d) - 2 * PDim<I>::ghost(d));
+		origFrom[d] = (da.localGhostSize(d) - 2 * da.ghost(d));
 	} else {
 		origTo[d] = (PDim<I>::localGhostSize(d) - PDim<I>::ghost(d));
 		origFrom[d] = da.ghost(d);
@@ -451,35 +454,30 @@ void DArray<T, I>::copyGhostCL(DArray<T, I> &da, const CartDir &d, const CartSid
 	origFrom[X] *= sizeof(T);
 	origTo[X] *= sizeof(T);
 	region[X] *= sizeof(T);
-	// Create Sub buffers to work with components separately
-	cl_mem *subBufFrom = new cl_mem[PDim<I>::getNC()];
-	cl_mem *subBufTo = new cl_mem[PDim<I>::getNC()];
-	for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
-		cl_int err;
-		cl_buffer_region clbr;
-		clbr.size = da.localGhostSize() * sizeof(T);
-		clbr.origin = clbr.size * cn;
-		subBufFrom[cn] = clCreateSubBuffer(da.clBuffer, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &clbr, &err);
-		CHECK_CL_ERROR(err);
-		clbr.size = PDim<I>::localGhostSize() * sizeof(T);
-		clbr.origin = clbr.size * cn;
-		subBufTo[cn] = clCreateSubBuffer(clBuffer, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &clbr, &err);
-		CHECK_CL_ERROR(err);
+	if (event == NULL) { // make blocking copy
+		cl_event* read_event_list = new cl_event[PDim<I>::getNC()];
+		cl_event* write_event_list = new cl_event[PDim<I>::getNC()];
+		for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
+			CHECK_CL_ERROR(clEnqueueReadBufferRect(da.clCQ, da.clBuffer, CL_TRUE, origFrom, origHost, region, da.localStride(Y) * sizeof(T), da.localStride(Z) * sizeof(T), region[X], region[X] * region[Y], hostMem + regionSize * cn, 0, NULL, &read_event_list[cn]));
+			origFrom[X] += da.localGhostSize() * sizeof(T);
+		}
+		CHECK_CL_ERROR(clWaitForEvents(PDim<I>::getNC(), read_event_list));
+		for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
+			CHECK_CL_ERROR(clEnqueueWriteBufferRect(clCQ, clBuffer, CL_TRUE, origTo, origHost, region, PDim<I>::localStride(Y) * sizeof(T), PDim<I>::localStride(Z) * sizeof(T), region[X], region[X] * region[Y], hostMem + regionSize * cn, 0, NULL, &write_event_list[cn]));
+			origTo[X] += PDim<I>::localGhostSize() * sizeof(T);
+		}
+		CHECK_CL_ERROR(clWaitForEvents(PDim<I>::getNC(), write_event_list));
+		for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
+			CHECK_CL_ERROR(clReleaseEvent(read_event_list[cn]));
+			CHECK_CL_ERROR(clReleaseEvent(write_event_list[cn]));
+		}
+		delete[] read_event_list;
+		delete[] write_event_list;
+		delete[] hostMem;
+	} else { // make non blocking copy
+		// TODO
+		delete[] hostMem;
 	}
-	// TODO make non blocking copy
-	for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
-		CHECK_CL_ERROR(clEnqueueReadBufferRect(da.clCQ, subBufFrom[cn], CL_TRUE, origFrom, origHost, region, da.localStride(Y) * sizeof(T), da.localStride(Z) * sizeof(T), region[X], region[X] * region[Y], hostMem + regionSize * cn, 0, NULL, NULL));
-	}
-	for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
-		CHECK_CL_ERROR(clEnqueueWriteBufferRect(clCQ, subBufTo[cn], CL_TRUE, origTo, origHost, region, PDim<I>::localStride(Y) * sizeof(T), PDim<I>::localStride(Z) * sizeof(T), region[X], region[X] * region[Y], hostMem + regionSize * cn, 0, NULL, NULL));
-	}
-	for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
-		CHECK_CL_ERROR(clReleaseMemObject(subBufFrom[cn]));
-		CHECK_CL_ERROR(clReleaseMemObject(subBufTo[cn]));
-	}
-	delete[] subBufTo;
-	delete[] subBufFrom;
-	delete[] hostMem;
 }
 
 template <typename T, typename I>
@@ -504,30 +502,19 @@ void DArray<T, I>::fillGhostCL(const CartDir &d, const CartSide &s) {
 	origFrom[X] *= sizeof(T);
 	origTo[X] *= sizeof(T);
 	region[X] *= sizeof(T);
-	// Create Sub buffers to work with components separately
-	cl_mem *subBuf = new cl_mem[PDim<I>::getNC()];
-	for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
-		cl_int err;
-		cl_buffer_region clbr;
-		clbr.size = PDim<I>::localGhostSize() * sizeof(T);
-		clbr.origin = clbr.size * cn;
-		subBuf[cn] = clCreateSubBuffer(clBuffer, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &clbr, &err);
-		CHECK_CL_ERROR(err);
-	}
 	// TODO make non blocking copy
-	for (I gh = 0; gh != PDim<I>::ghost(d); ++gh) {
-		for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
+	for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
+		for (I gh = 0; gh != PDim<I>::ghost(d); ++gh) {
 			cl_event event;
-			CHECK_CL_ERROR(clEnqueueCopyBufferRect(clCQ, subBuf[cn], subBuf[cn], origFrom, origTo, region, PDim<I>::localStride(Y) * sizeof(T), PDim<I>::localStride(Z) * sizeof(T), PDim<I>::localStride(Y) * sizeof(T), PDim<I>::localStride(Z) * sizeof(T), 0, NULL, &event));
+			CHECK_CL_ERROR(clEnqueueCopyBufferRect(clCQ, clBuffer, clBuffer, origFrom, origTo, region, PDim<I>::localStride(Y) * sizeof(T), PDim<I>::localStride(Z) * sizeof(T), PDim<I>::localStride(Y) * sizeof(T), PDim<I>::localStride(Z) * sizeof(T), 0, NULL, &event));
 			CHECK_CL_ERROR(clWaitForEvents(1, &event));
 			CHECK_CL_ERROR(clReleaseEvent(event));
+			origTo[d] += (d == X) ? sizeof(T) : 1;
 		}
-		origTo[d] += (d == X) ? sizeof(T) : 1;
+		origTo[d] -= ((d == X) ? sizeof(T) : 1) * PDim<I>::ghost(d);
+		origFrom[X] += PDim<I>::localGhostSize() * sizeof(T);
+		origTo[X] += PDim<I>::localGhostSize() * sizeof(T);
 	}
-	for (I cn = 0; cn != PDim<I>::getNC(); ++cn) {
-		CHECK_CL_ERROR(clReleaseMemObject(subBuf[cn]));
-	}
-	delete[] subBuf;
 }
 
 #endif // USE_OPENCL

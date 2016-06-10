@@ -23,8 +23,11 @@ unsigned getDNum(cl_platform_id platform, cl_device_type devType = CL_DEVICE_TYP
 {
 	unsigned dNumTest = 0;
 	unsigned dNum = 0;
+	cl_device_id* device = NULL; // amd thinks that this is not enought, so we have to allocate memory for useless device list
 	while (dNumTest == dNum) {
-		CHECK_CL_ERROR(clGetDeviceIDs(platform, devType, ++dNumTest, NULL, &dNum));
+		device = new cl_device_id[dNumTest + 1];
+		CHECK_CL_ERROR(clGetDeviceIDs(platform, devType, ++dNumTest, device, &dNum));
+		delete [] device;
 	}
 	return dNum;
 }
