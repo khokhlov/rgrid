@@ -118,6 +118,7 @@ public:
 		return &dac.getDArrayPart(x, y, z)[0];
 	}
 	/* start saving data to file */
+	// TODO: fmt does nothing
 	void saveDataBegin(std::string filename, const rgio::format fmt) {
 		std::stringstream ss;
 		Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
@@ -135,21 +136,61 @@ public:
 		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
 		MPI_CHECK(MPI_File_set_view(fh, header.size() * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
 		DArray<T, I> tda;
+		// TODO next function very slow
 		dac.getDArray(tda);
-		MPI_Request req;
-		saveDataRequest.clear();
-		MPI_CHECK(MPI_File_iwrite(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank), &req));
-		saveDataRequest.push_back(req);
+		// TODO check saveDataRequest
+		// TODO use nonblocking
+		//MPI_CHECK(MPI_File_iwrite(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank), &saveDataRequest));
+		MPI_CHECK(MPI_File_write(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
 	}
 	/* Wait while all data will be saved */
 	void saveDataEnd() {
-		MPI_CHECK(MPI_Waitall(saveDataRequest.size(), &saveDataRequest.at(0), MPI_STATUSES_IGNORE));
-		saveDataRequest.clear();
+		//MPI_CHECK(MPI_Wait(&saveDataRequest, MPI_STATUS_IGNORE));
 		MPI_CHECK(MPI_File_close(&fh));
+	}
+	/* start loading data from file */
+	// TODO: fmt does nothing
+	void loadDataBegin(std::string filename) {
+		std::fstream fs;
+		Dim3D<I> size;
+		I nc;
+		rgio::format fmt;
+		long offset;
+		// read header
+		if (rgmpi::commRank(cartComm) == 0) {
+			fs.open(filename.c_str());
+			rgio::loadHeader(fs, size, nc, fmt);
+			offset = fs.tellg();
+			fs.close();
+		}
+		MPI_CHECK(MPI_Bcast(&offset, 1, MPI_LONG, 0, cartComm));
+		// read data
+		MPI_CHECK(MPI_File_open(MPI_COMM_WORLD, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh));
+		MPI_CHECK(MPI_File_set_view(fh, offset * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
+		// slow implementation
+		// TODO check saveDataRequest
+		tda_ld.resize(
+			RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
+			RGCut<I>::partNodes(X, cartPos[X]), RGCut<I>::partNodes(Y, cartPos[Y]), RGCut<I>::partNodes(Z, cartPos[Z]),
+			RGCut<I>::partOrigin(X, cartPos[X]), RGCut<I>::partOrigin(Y, cartPos[Y]), RGCut<I>::partOrigin(Z, cartPos[Z]),
+			ghost[X], ghost[Y], ghost[Z],
+			nc
+		);
+		//MPI_CHECK(MPI_File_iread(fh, tda_ld.getDataRaw(), 1, arrayDt.at(cartRank), &saveDataRequest));
+		MPI_CHECK(MPI_File_read(fh, tda_ld.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
+	}
+	/* wait while all data will be loaded */
+	void loadDataEnd() {
+		//MPI_CHECK(MPI_Wait(&saveDataRequest, MPI_STATUS_IGNORE));
+		dac.setDArray(tda_ld, localPt[X], localPt[Y], localPt[Z]);
+		MPI_CHECK(MPI_File_close(&fh));
+		tda_ld.resize(0,0,0, 0,0,0, 0,0,0, 0,0,0, 0); // free memory
 	}
 private:
 	MPI_File fh;
-	std::vector<MPI_Request> saveDataRequest;
+	// request for saveDataBegin/saveDataEnd and loadDataBegin/loadDataEnd
+	MPI_Request saveDataRequest;
+	// datatypes for local array
 	std::vector<MPI_Datatype> locArrayDt;
 
 private:
@@ -178,7 +219,7 @@ private:
 
 	/* container for local darrays */
 	DArrayContainer<T, I> dac;
-	/* position of local DArray */
+	/* position of local DArrayContainer */
 	I cartPos[ALL_DIRS];
 	/* cart comm for current decomposition */
 	MPI_Comm cartComm;
@@ -208,6 +249,8 @@ private:
 	MPI_Datatype viewType;
 	/* RGCut for local DArrayContainer */
 	RGCut<I> dacCut;
+	/* temp DArray for loadDataBegin/loadDataEnd */
+	DArray<T, I> tda_ld;
 };
 
 template <typename T, typename I>

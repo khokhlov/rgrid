@@ -84,7 +84,7 @@ TEST_CASE("DArrayScatter scatter and gather")
 	}
 }
 
-TEST_CASE("DArrayScatter IO 1") {	
+TEST_CASE("DArrayScatter IO 1 - MPI save") {	
 	if (rgmpi::worldSize() == 1 * 1 * 1) {
 	
 		rgrid::DArrayScatter<int, int> das;
@@ -124,7 +124,7 @@ TEST_CASE("DArrayScatter IO 1") {
 	}
 }
 
-TEST_CASE("DArrayScatter IO 2") {	
+TEST_CASE("DArrayScatter IO 2 - MPI save") {	
 	if (rgmpi::worldSize() == 2 * 1 * 1) {
 	
 		rgrid::DArrayScatter<int, int> das;
@@ -163,7 +163,7 @@ TEST_CASE("DArrayScatter IO 2") {
 	}
 }
 
-TEST_CASE("DArrayScatter IO 3") {	
+TEST_CASE("DArrayScatter IO 3 - MPI save") {	
 	if (rgmpi::worldSize() == 3 * 4 * 5) {
 	
 		rgrid::DArrayScatter<int, int> das;
@@ -198,6 +198,53 @@ TEST_CASE("DArrayScatter IO 3") {
 			das.saveDataBegin("test_das_io3_1.txt", rgrid::rgio::BINARY);
 			das.saveDataEnd();
 			das.gatherAndGet(0, d2);
+		}
+	}
+}
+
+TEST_CASE("DArrayScatter IO 4 - MPI save/load") {	
+	if (rgmpi::worldSize() == 3 * 1 * 2) {
+	
+		rgrid::DArrayScatter<int, int> das, das2;
+		int const size[3] = { 17, 50, 6 };
+		int const gp[3] = { 3, 1, 2 };
+		int const lp[3] = { 2, 1, 1 };
+		int const ghost[3] = { 3, 0, 1 };
+		das.setSizes(size, gp, lp, ghost, 2);
+		das2.setSizes(size, gp, lp, ghost, 2);
+		
+		if (das.getInternalRank() == 0) {
+			rgrid::DArray<int, int> d1, d2, d3;
+			d1.resize(17, 50, 6, 17, 50, 6, 0, 0, 0, 3, 0, 1, 2);
+			d1.fill(4);
+			d1(12, 23, 0, 0) = 7;
+			d1(3, 3, 5, 1) = 3;
+			d1.fillGhost();
+			das.setAndScatter(0, d1);
+			das.saveDataBegin("test_das_io4_1.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			
+			das.gatherAndGet(0, d3);
+			
+			das2.loadDataBegin("test_das_io4_1.txt");
+			das2.loadDataEnd();
+			printf("7\n");
+			das2.gatherAndGet(0, d2);
+			printf("8\n");
+			REQUIRE(d3 == d2);
+		} else {
+			rgrid::DArray<int, int> d1;
+			das.setAndScatter(0, d1);
+			
+			das.saveDataBegin("test_das_io4_1.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			
+			das.gatherAndGet(0, d1);
+			
+			das2.loadDataBegin("test_das_io4_1.txt");
+			das2.loadDataEnd();
+			
+ 			das2.gatherAndGet(0, d1);
 		}
 	}
 }
