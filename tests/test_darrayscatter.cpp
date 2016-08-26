@@ -203,12 +203,106 @@ TEST_CASE("DArrayScatter IO 3 - MPI save") {
 }
 
 TEST_CASE("DArrayScatter IO 4 - MPI save/load") {	
-	if (rgmpi::worldSize() == 3 * 1 * 2) {
+	if (rgmpi::worldSize() == 1 * 1 * 1) {
 	
 		rgrid::DArrayScatter<int, int> das, das2;
 		int const size[3] = { 17, 50, 6 };
-		int const gp[3] = { 3, 1, 2 };
-		int const lp[3] = { 2, 1, 1 };
+		int const gp[3] = { 1, 1, 1 };
+		int const lp[3] = { 1, 1, 1 };
+		int const ghost[3] = { 0, 0, 0 };
+		das.setSizes(size, gp, lp, ghost, 1);
+		das2.setSizes(size, gp, lp, ghost, 1);
+		
+		if (das.getInternalRank() == 0) {
+			rgrid::DArray<int, int> d1, d2, d3;
+			d1.resize(17, 50, 6, 17, 50, 6, 0, 0, 0, 0, 0, 0, 1);
+			d1.fill(4);
+			d1(12, 23, 0, 0) = 7;
+			d1(3, 3, 5, 0) = 3;
+			d1.fillGhost();
+			das.setAndScatter(0, d1);
+			das.saveDataBegin("test_das_io4.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			
+			std::fstream fs;
+			fs.open("test_das_io4.txt", std::ios_base::out);
+			d1.saveData(fs, rgrid::rgio::BINARY);
+			fs.close();
+			
+			das.gatherAndGet(0, d3);
+						
+			das2.loadDataBegin("test_das_io4.txt");
+			das2.loadDataEnd();
+			das2.gatherAndGet(0, d2);
+			REQUIRE(d3 == d2);
+		} else {
+			rgrid::DArray<int, int> d1;
+			das.setAndScatter(0, d1);
+			
+			das.saveDataBegin("test_das_io4.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			
+			das.gatherAndGet(0, d1);
+			
+			das2.loadDataBegin("test_das_io4.txt");
+			das2.loadDataEnd();
+			
+ 			das2.gatherAndGet(0, d1);
+		}
+	}
+}
+
+TEST_CASE("DArrayScatter IO 5 - MPI save/load") {	
+	if (rgmpi::worldSize() == 1 * 2 * 1) {
+	
+		rgrid::DArrayScatter<int, int> das, das2;
+		int const size[3] = { 17, 50, 6 };
+		int const gp[3] = { 1, 2, 1 };
+		int const lp[3] = { 1, 1, 1 };
+		int const ghost[3] = { 0, 0, 0 };
+		das.setSizes(size, gp, lp, ghost, 1);
+		das2.setSizes(size, gp, lp, ghost, 1);
+		
+		if (das.getInternalRank() == 0) {
+			rgrid::DArray<int, int> d1, d2, d3;
+			d1.resize(17, 50, 6, 17, 50, 6, 0, 0, 0, 0, 0, 0, 1);
+			d1.fill(4);
+			d1(12, 23, 0, 0) = 7;
+			d1(3, 3, 5, 0) = 3;
+			d1.fillGhost();
+			das.setAndScatter(0, d1);
+			das.saveDataBegin("test_das_io5.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			
+			das.gatherAndGet(0, d3);
+			
+			das2.loadDataBegin("test_das_io5.txt");
+			das2.loadDataEnd();
+			das2.gatherAndGet(0, d2);
+			REQUIRE(d3 == d2);
+		} else {
+			rgrid::DArray<int, int> d1;
+			das.setAndScatter(0, d1);
+			
+			das.saveDataBegin("test_das_io5.txt", rgrid::rgio::BINARY);
+			das.saveDataEnd();
+			
+			das.gatherAndGet(0, d1);
+			
+			das2.loadDataBegin("test_das_io5.txt");
+			das2.loadDataEnd();
+ 			das2.gatherAndGet(0, d1);			
+		}
+	}
+}
+
+TEST_CASE("DArrayScatter IO - MPI save/load") {	
+	if (rgmpi::worldSize() == 10 * 2 * 3) {
+	
+		rgrid::DArrayScatter<int, int> das, das2;
+		int const size[3] = { 17, 50, 6 };
+		int const gp[3] = { 10, 2, 3 };
+		int const lp[3] = { 1, 1, 1 };
 		int const ghost[3] = { 3, 0, 1 };
 		das.setSizes(size, gp, lp, ghost, 2);
 		das2.setSizes(size, gp, lp, ghost, 2);
@@ -221,30 +315,27 @@ TEST_CASE("DArrayScatter IO 4 - MPI save/load") {
 			d1(3, 3, 5, 1) = 3;
 			d1.fillGhost();
 			das.setAndScatter(0, d1);
-			das.saveDataBegin("test_das_io4_1.txt", rgrid::rgio::BINARY);
+			das.saveDataBegin("test_das_io_mpisl.txt", rgrid::rgio::BINARY);
 			das.saveDataEnd();
 			
 			das.gatherAndGet(0, d3);
 			
-			das2.loadDataBegin("test_das_io4_1.txt");
+			das2.loadDataBegin("test_das_io_mpisl.txt");
 			das2.loadDataEnd();
-			printf("7\n");
 			das2.gatherAndGet(0, d2);
-			printf("8\n");
 			REQUIRE(d3 == d2);
 		} else {
 			rgrid::DArray<int, int> d1;
 			das.setAndScatter(0, d1);
 			
-			das.saveDataBegin("test_das_io4_1.txt", rgrid::rgio::BINARY);
+			das.saveDataBegin("test_das_io_mpisl.txt", rgrid::rgio::BINARY);
 			das.saveDataEnd();
 			
 			das.gatherAndGet(0, d1);
 			
-			das2.loadDataBegin("test_das_io4_1.txt");
+			das2.loadDataBegin("test_das_io_mpisl.txt");
 			das2.loadDataEnd();
-			
- 			das2.gatherAndGet(0, d1);
+ 			das2.gatherAndGet(0, d1);			
 		}
 	}
 }

@@ -152,20 +152,17 @@ public:
 	// TODO: fmt does nothing
 	void loadDataBegin(std::string filename) {
 		std::fstream fs;
-		Dim3D<I> size;
-		I nc;
-		rgio::format fmt;
 		long offset;
 		// read header
 		if (rgmpi::commRank(cartComm) == 0) {
-			fs.open(filename.c_str());
-			rgio::loadHeader(fs, size, nc, fmt);
-			offset = fs.tellg();
-			fs.close();
+			I nc; // useless, IMPROVE code
+			rgio::format fmt; // useless
+			Dim3D<I> size; // useless
+			offset = rgio::loadHeaderMPI(filename, size, nc, fmt);
 		}
 		MPI_CHECK(MPI_Bcast(&offset, 1, MPI_LONG, 0, cartComm));
 		// read data
-		MPI_CHECK(MPI_File_open(MPI_COMM_WORLD, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh));
+		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh));
 		MPI_CHECK(MPI_File_set_view(fh, offset * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
 		// slow implementation
 		// TODO check saveDataRequest
@@ -178,6 +175,7 @@ public:
 		);
 		//MPI_CHECK(MPI_File_iread(fh, tda_ld.getDataRaw(), 1, arrayDt.at(cartRank), &saveDataRequest));
 		MPI_CHECK(MPI_File_read(fh, tda_ld.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
+		
 	}
 	/* wait while all data will be loaded */
 	void loadDataEnd() {

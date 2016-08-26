@@ -126,7 +126,7 @@ void DArrayContainer<T, I>::setDArray(const DArray<T, I> &da, const I px, const 
 			for (I i = 0; i != px; ++i) {
 				I ind = RGCut<I>::linInd(i, j, k);
 				I o[ALL_DIRS] = { RGCut<I>::partOrigin(X, i), RGCut<I>::partOrigin(Y, j), RGCut<I>::partOrigin(Z, k) };
-				dArray[ind].resize(da.globalSize(X), da.globalSize(Y), da.globalSize(Z),
+				dArray.at(ind).resize(da.globalSize(X), da.globalSize(Y), da.globalSize(Z),
 				                   RGCut<I>::partNodes(X, i), RGCut<I>::partNodes(Y, j), RGCut<I>::partNodes(Z, k),
 				                   da.origin(X) + o[X], da.origin(Y) + o[Y], da.origin(Z) + o[Z],
 				                   da.ghost(X), da.ghost(Y), da.ghost(Z),
@@ -135,7 +135,7 @@ void DArrayContainer<T, I>::setDArray(const DArray<T, I> &da, const I px, const 
 					for (I k2 = 0; k2 != RGCut<I>::partNodes(Z, k); ++k2)
 						for (I j2 = 0; j2 != RGCut<I>::partNodes(Y, j); ++j2)
 							for (I i2 = 0; i2 != RGCut<I>::partNodes(X, i); ++i2) {
-								dArray[ind](i2, j2, k2, cn) = da(o[X] + i2, o[Y] + j2, o[Z] + k2, cn);
+								dArray.at(ind)(i2, j2, k2, cn) = da(o[X] + i2, o[Y] + j2, o[Z] + k2, cn);
 							}
 			}
 }
@@ -143,25 +143,25 @@ void DArrayContainer<T, I>::setDArray(const DArray<T, I> &da, const I px, const 
 template <typename T, typename I>
 void DArrayContainer<T, I>::getDArray(DArray<T, I> &da) const {
 	da.resize(
-	    dArray[0].globalSize(X), dArray[0].globalSize(Y), dArray[0].globalSize(Z),
+	    dArray.at(0).globalSize(X), dArray.at(0).globalSize(Y), dArray.at(0).globalSize(Z),
 	    RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
-	    dArray[0].origin(X), dArray[0].origin(Y), dArray[0].origin(Z),
-	    dArray[0].ghost(X), dArray[0].ghost(Y), dArray[0].ghost(Z),
-	    dArray[0].getNC());
+	    dArray.at(0).origin(X), dArray.at(0).origin(Y), dArray.at(0).origin(Z),
+	    dArray.at(0).ghost(X), dArray.at(0).ghost(Y), dArray.at(0).ghost(Z),
+	    dArray.at(0).getNC());
 	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
 		for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
 			for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
 				I ind = RGCut<I>::linInd(i, j, k);
-				for (I cn = 0; cn != dArray[0].getNC(); ++cn)
-					for (I k2 = 0; k2 != dArray[ind].localSize(Z); ++k2)
-						for (I j2 = 0; j2 != dArray[ind].localSize(Y); ++j2)
-							for (I i2 = 0; i2 != dArray[ind].localSize(X); ++i2) {
+				for (I cn = 0; cn != dArray.at(0).getNC(); ++cn)
+					for (I k2 = 0; k2 != dArray.at(ind).localSize(Z); ++k2)
+						for (I j2 = 0; j2 != dArray.at(ind).localSize(Y); ++j2)
+							for (I i2 = 0; i2 != dArray.at(ind).localSize(X); ++i2) {
 								I orig[ALL_DIRS] = {
-									dArray[ind].origin(X) - da.origin(X),
-									dArray[ind].origin(Y) - da.origin(Y),
-									dArray[ind].origin(Z) - da.origin(Z)
+									dArray.at(ind).origin(X) - da.origin(X),
+									dArray.at(ind).origin(Y) - da.origin(Y),
+									dArray.at(ind).origin(Z) - da.origin(Z)
 								};
-								da(orig[X] + i2, orig[Y] + j2, orig[Z] + k2, cn) = dArray[ind](i2, j2, k2, cn);
+								da(orig[X] + i2, orig[Y] + j2, orig[Z] + k2, cn) = dArray.at(ind)(i2, j2, k2, cn);
 							}
 			}
 
@@ -191,7 +191,7 @@ void DArrayContainer<T, I>::getSubArray(I ox, I oy, I oz, I sx, I sy, I sz, std:
 
 template <typename T, typename I>
 void DArrayContainer<T, I>::setSubArray(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer) {
-	I nc = dArray[0].getNC();
+	I nc = dArray.at(0).getNC();
 	RG_ASSERT(buffer.size() == sx * sy * sz * nc, "Wrong buffer size");
 	I bufInd = 0;
 	for (I cn = 0; cn != nc; ++cn)
