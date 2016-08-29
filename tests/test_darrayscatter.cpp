@@ -340,4 +340,44 @@ TEST_CASE("DArrayScatter IO - MPI save/load") {
 	}
 }
 
+TEST_CASE("DArrayScatter external sync") {
+	if (rgmpi::worldSize() == 2 * 2 * 2) {
+	
+		rgrid::DArrayScatter<int, int> das;
+		int const gp[3] = { 2, 2, 2 };
+		int const lp[3] = { 1, 1, 1 };
+		int const ghost[3] = { 1, 1, 1 };
+		das.setParts(gp, lp, ghost);
+		
+		rgrid::DArray<int, int> d1;
+		
+		if (das.getInternalRank() == 0) {
+			d1.resize(2, 2, 2, 2, 2, 2, 0, 0, 0, 1, 1, 1, 1);
+			d1.fill(4);
+			d1(0, 0, 0, 0) = 7;
+			d1(1, 0, 0, 0) = 3;
+		}	
+		
+		das.setAndScatter(0, d1);
+			
+		rgrid::DArrayContainer<int, int>& dac = das.getLocalContainer();
+			
+		das.externalSyncStart();
+		das.externalSyncEnd();
+		
+		if (das.getInternalRank() == 0) {
+			REQUIRE(dac.getDArrayPart(0).val(1, 0, 0, 0) == 3);
+		}
+		if (das.getInternalRank() == 1) {
+			REQUIRE(dac.getDArrayPart(0).val(-1, 0, 0, 0) == 7);
+		}
+		if (das.getInternalRank() == 3) {
+			REQUIRE(dac.getDArrayPart(0).val(0, 0, 1, 0) == 4);
+		}
+		
+		MPI_Barrier(MPI_COMM_WORLD);
+		das.gatherAndGet(0, d1);
+	}
+}
+
 #endif /* USE_MPI */

@@ -89,7 +89,7 @@ public:
 	 */
 	void internalSync();
 	/*
-	 * start to receive ghost ghost for local DArrays in local
+	 * start to receive ghost nodes for local DArrays in local
 	 * DArrayContainer from other processes
 	 */
 	void externalSyncStart();
@@ -105,6 +105,10 @@ public:
 	/* get rank in internal cart comm */
 	int getInternalRank() const {
 		return cartRank;
+	}
+	/* get position of current process in cart comm */
+	int getInternalPos(CartDir d) {
+		return cartPos[d];
 	}
 	/* get number of components */
 	I getNC() const {
@@ -335,6 +339,7 @@ void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> cons
 	if (cartComm == MPI_COMM_NULL) return;
 	std::vector<MPI_Request> req;
 	if (processRank == cartRank) {
+		// TODO call setSizes instead assert
 		RG_ASSERT(RGCut<I>::numNodes() == da.localSize(), "Wrong number of nodes");
 		req.resize(RGCut<I>::numParts());
 		// send parts to all processes
@@ -555,7 +560,7 @@ void DArrayScatter<T, I>::externalSyncStart() {
 			if (neigh[s][d] != NO_NEIGHBOUR) {
 				CartDir ort1, ort2;
 				ortDirs(d, ort1, ort2);
-				I bufSize = RGCut<I>::partNodes(ort1) * RGCut<I>::partNodes(ort2) * ghost[d];
+				I bufSize = dacCut.partNodes(ort1, cartPos[ort1]) * dacCut.partNodes(ort2, cartPos[ort2]) * ghost[d];
 				// start recv
 				recvBuf[s][d].resize(bufSize);
 				MPI_CHECK(MPI_Irecv(&recvBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
@@ -563,16 +568,17 @@ void DArrayScatter<T, I>::externalSyncStart() {
 				// sub array size and position
 				I orig[ALL_DIRS] = { 0, 0, 0 };
 				I size[ALL_DIRS] = {
-					RGCut<I>::partNodes(X, cartPos[X]),
-					RGCut<I>::partNodes(Y, cartPos[Y]),
-					RGCut<I>::partNodes(Z, cartPos[Z]),
+					dacCut.partNodes(X, cartPos[X]),
+					dacCut.partNodes(Y, cartPos[Y]),
+					dacCut.partNodes(Z, cartPos[Z]),
 				};
 				size[d] = ghost[d];
-				orig[d] = (s == SIDE_LEFT) ? 0 : RGCut<I>::numNodes(d) - ghost(d);
+				orig[d] = (s == SIDE_LEFT) ? 0 : dacCut.numNodes(d) - ghost[d];
 				dac.getSubArray(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], sendBuf[s][d]);
 				MPI_CHECK(MPI_Isend(&sendBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncSendReq[s + d * SIDE_ALL]));
 			} else {
 				syncRecvReq[s + d * SIDE_ALL] = MPI_REQUEST_NULL;
+				syncSendReq[s + d * SIDE_ALL] = MPI_REQUEST_NULL;
 			}
 }
 
@@ -585,20 +591,20 @@ void DArrayScatter<T, I>::externalSyncEnd() {
 		if (index == MPI_UNDEFINED) {
 			break;
 		}
-		CartSide s = index % SIDE_ALL;
-		CartDir d = index / ALL_DIRS;
+		CartSide s = static_cast<CartSide>(index % SIDE_ALL);
+		CartDir d = static_cast<CartDir>(index / SIDE_ALL);
 		CartDir ort1, ort2;
 		ortDirs(d, ort1, ort2);
 		// sub array size and position
 		I orig[ALL_DIRS] = { 0, 0, 0 };
 		I size[ALL_DIRS] = {
-			RGCut<I>::partNodes(X, cartPos[X]),
-			RGCut<I>::partNodes(Y, cartPos[Y]),
-			RGCut<I>::partNodes(Z, cartPos[Z]),
+			dacCut.partNodes(X, cartPos[X]),
+			dacCut.partNodes(Y, cartPos[Y]),
+			dacCut.partNodes(Z, cartPos[Z]),
 		};
 		size[d] = ghost[d];
-		orig[d] = (s == SIDE_LEFT) ? -ghost[d] : RGCut<I>::numNodes(d);
-		dac.setSubArray(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], recvBuf[s][d]);
+		orig[d] = (s == SIDE_LEFT) ? -ghost[d] : dacCut.numNodes(d);
+		dac.setSubArrayWithGhost(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], recvBuf[s][d]);
 	}
 	MPI_CHECK(MPI_Waitall(SIDE_ALL * ALL_DIRS, syncSendReq, MPI_STATUSES_IGNORE));
 }

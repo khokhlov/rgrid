@@ -30,14 +30,14 @@ public:
 	// get specific part of DArray
 	DArray<T, I> &getDArrayPart(const I partNum) {
 		RG_ASSERT(dArray.size() > static_cast<size_t>(partNum), "Out of range");
-		return dArray[partNum];
+		return dArray.at(partNum);
 	}
 	const DArray<T, I> &getDArrayPart(const I partNum) const {
 		RG_ASSERT(dArray.size() > static_cast<size_t>(partNum), "Out of range");
-		return dArray[partNum];
+		return dArray.at(partNum);
 	}
 	DArray<T, I> &getDArrayPart(const I i, const I j, const I k) {
-		return dArray[RGCut<I>::linInd(i, j, k)];
+		return dArray.at(RGCut<I>::linInd(i, j, k));
 	}
 
 	DArray<T, I> &operator()(const I px, const I py, const I pz) {
@@ -60,6 +60,10 @@ public:
 	 * buffer must contain sx * sy * sz * cn elements
 	 */
 	void setSubArray(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer);
+	/*
+	 * the same as setSubArray, but indexes can be in ghost nodes
+	 */
+	void setSubArrayWithGhost(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer);
 	/*
 	 * fill boundary ghost nodes with values from nearest nodes
 	 */
@@ -169,6 +173,7 @@ void DArrayContainer<T, I>::getDArray(DArray<T, I> &da) const {
 
 template <typename T, typename I>
 void DArrayContainer<T, I>::getSubArray(I ox, I oy, I oz, I sx, I sy, I sz, std::vector<T> &buffer) {
+	RG_ASSERT(!dArray.empty(), "There are no DArrays");
 	I nc = dArray.front().getNC();
 	buffer.clear();
 	buffer.reserve(sx * sy * sz * nc);
@@ -185,29 +190,53 @@ void DArrayContainer<T, I>::getSubArray(I ox, I oy, I oz, I sx, I sy, I sz, std:
 					I nodeX = RGCut<I>::locateIndex(X, xp);
 					I nodeY = RGCut<I>::locateIndex(Y, yp);
 					I nodeZ = RGCut<I>::locateIndex(Z, zp);
-					buffer.push_back(dArray[RGCut<I>::linInd(partX, partY, partZ)].val(nodeX, nodeY, nodeZ, cn));
+					buffer.push_back(dArray.at(RGCut<I>::linInd(partX, partY, partZ)).val(nodeX, nodeY, nodeZ, cn));
 				}
 }
 
 template <typename T, typename I>
 void DArrayContainer<T, I>::setSubArray(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer) {
 	I nc = dArray.at(0).getNC();
-	RG_ASSERT(buffer.size() == sx * sy * sz * nc, "Wrong buffer size");
+	RG_ASSERT(buffer.size() == static_cast<typename std::vector<T>::size_type>(sx * sy * sz * nc), "Wrong buffer size");
 	I bufInd = 0;
 	for (I cn = 0; cn != nc; ++cn)
 		for (I z = 0; z != sz; ++z)
 			for (I y = 0; y != sy; ++y)
 				for (I x = 0; x != sx; ++x) {
-					I xp = ox + x;
-					I yp = oy + y;
-					I zp = oz + z;
-					I partX = RGCut<I>::locatePart(X, xp);
-					I partY = RGCut<I>::locatePart(Y, yp);
-					I partZ = RGCut<I>::locatePart(Z, zp);
-					I nodeX = RGCut<I>::locateIndex(X, xp);
-					I nodeY = RGCut<I>::locateIndex(Y, yp);
-					I nodeZ = RGCut<I>::locateIndex(Z, zp);
-					dArray.at(RGCut<I>::linInd(partX, partY, partZ)).val(nodeX, nodeY, nodeZ, cn) = buffer.at(bufInd++);
+					Dim3D<I> pos(ox + x, oy + y, oz + z);
+					Dim3D<I> part, node;
+					for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d+1)) {
+						part[d] = RGCut<I>::locatePart(d, pos[d]);
+						node[d] = RGCut<I>::locateIndex(d, pos[d]);
+					}
+					dArray.at(RGCut<I>::linInd(part.x, part.y, part.z)).val(node.x, node.y, node.z, cn) = buffer.at(bufInd++);
+				}
+}
+
+template <typename T, typename I>
+void DArrayContainer<T, I>::setSubArrayWithGhost(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer) {
+	I nc = dArray.at(0).getNC();
+	RG_ASSERT(buffer.size() == static_cast<typename std::vector<T>::size_type>(sx * sy * sz * nc), "Wrong buffer size");
+	I bufInd = 0;
+	for (I cn = 0; cn != nc; ++cn)
+		for (I z = 0; z != sz; ++z)
+			for (I y = 0; y != sy; ++y)
+				for (I x = 0; x != sx; ++x) {
+					Dim3D<I> pos(ox + x, oy + y, oz + z);
+					Dim3D<I> part, node;
+					for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d+1)) {
+						if (pos[d] < 0) {
+							part[d] = 0;
+							node[d] = pos[d];
+						} else if (pos[d] >= RGCut<I>::numNodes(d)) {
+							part[d] = RGCut<I>::numParts(d) - 1;
+							node[d] = pos[d] - RGCut<I>::numNodes(d) + RGCut<I>::partNodes(d, part[d]);
+						} else {
+							part[d] = RGCut<I>::locatePart(d, pos[d]);
+							node[d] = RGCut<I>::locateIndex(d, pos[d]);
+						}
+					}
+					dArray.at(RGCut<I>::linInd(part.x, part.y, part.z)).val(node.x, node.y, node.z, cn) = buffer.at(bufInd++);
 				}
 }
 
