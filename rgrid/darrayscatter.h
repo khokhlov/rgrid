@@ -1,8 +1,7 @@
 #ifndef DARRAY_SCATTER_H
 #define DARRAY_SCATTER_H
 
-// TODO remove
-#include <cstdio>
+#include <cstddef>
 
 #include "rgrid/darraycontainer.h"
 #include "rgrid/pdim.h"
@@ -21,19 +20,37 @@ public:
 	/*
 	 * Use setSizes() if you create object by this constructor
 	 */
-	DArrayScatter() {
-		this->init();
+	DArrayScatter() : cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL) 
+	{
+		I const size[ALL_DIRS] = {1, 1, 1};
+		I const globalPt[ALL_DIRS] = {1, 1, 1};
+		I const localPt[ALL_DIRS] = {1, 1, 1};
+		I const ghost[ALL_DIRS] = {0, 0, 0};
+		I const nc = 1;
+		setSizes(size, globalPt, localPt, ghost, nc);
 	};
 	DArrayScatter(I const size[ALL_DIRS],
 	              I const globalPt[ALL_DIRS],
 	              I const localPt[ALL_DIRS],
 	              I const ghost[ALL_DIRS],
-	              I const nc) {
-		this->init();
+	              I const nc) 
+		: cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL) 
+	{
 		setSizes(size, globalPt, localPt, ghost, nc);
 	};
 	~DArrayScatter();
+	
 	/*
+	 * specify global parts (MPI), local parts (OpenCL) and ghost
+	 */
+	void setParts(I const globalPt[ALL_DIRS],
+	              I const localPt[ALL_DIRS],
+	              I const ghost[ALL_DIRS]) {
+		setSizes(globalPt, globalPt, localPt, ghost, nc);
+	}
+	
+	/*
+	 * Set all sizes, use setParts instead this function
 	 * size is number of nodes in each direction
 	 * globalPt is number of process parts, must be the same on all processes and
 	 * globalPt[X] * globalPt[Y] * globalPt[Z] == size of processes in MPI_COMM_WORLD
@@ -120,6 +137,7 @@ public:
 	/* start saving data to file */
 	// TODO: fmt does nothing
 	void saveDataBegin(std::string filename, const rgio::format fmt) {
+		if (cartComm == MPI_COMM_NULL) return;
 		std::stringstream ss;
 		Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
 		rgio::writeHeader(ss, size, getNC(), fmt);
@@ -135,59 +153,77 @@ public:
 		// write data
 		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
 		MPI_CHECK(MPI_File_set_view(fh, header.size() * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
-		DArray<T, I> tda;
 		// TODO next function very slow
 		dac.getDArray(tda);
-		// TODO check saveDataRequest
-		// TODO use nonblocking
-		//MPI_CHECK(MPI_File_iwrite(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank), &saveDataRequest));
-		MPI_CHECK(MPI_File_write(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
+		MPI_CHECK(MPI_File_write_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
 	}
 	/* Wait while all data will be saved */
 	void saveDataEnd() {
-		//MPI_CHECK(MPI_Wait(&saveDataRequest, MPI_STATUS_IGNORE));
+		if (cartComm == MPI_COMM_NULL) return;
+		MPI_CHECK(MPI_File_write_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
 		MPI_CHECK(MPI_File_close(&fh));
 	}
 	/* start loading data from file */
 	// TODO: fmt does nothing
 	void loadDataBegin(std::string filename) {
+		if (cartComm == MPI_COMM_NULL) return;
 		std::fstream fs;
-		long offset;
-		// read header
+		struct newParams {
+			I size[ALL_DIRS];
+			I components;
+			long offset;
+			int format;
+		} np;
+		// read header by first process
 		if (rgmpi::commRank(cartComm) == 0) {
-			I nc; // useless, IMPROVE code
-			rgio::format fmt; // useless
-			Dim3D<I> size; // useless
-			offset = rgio::loadHeaderMPI(filename, size, nc, fmt);
+			rgio::format fmt;
+			Dim3D<I> size;
+			np.offset = rgio::loadHeaderMPI(filename, size, np.components, fmt);
+			np.size[X] = size[X];
+			np.size[Y] = size[Y];
+			np.size[Z] = size[Z];
+			np.format = fmt;
 		}
-		MPI_CHECK(MPI_Bcast(&offset, 1, MPI_LONG, 0, cartComm));
+		// send header info to other processes
+		const int nitems = 4;
+		const int blocklengths[nitems] = {ALL_DIRS, 1, 1, 1};
+		const MPI_Datatype types[nitems] = {rgmpi::getMPItype<I>(), rgmpi::getMPItype<I>(), MPI_LONG, MPI_INT};
+		MPI_Datatype mpi_np_type;
+		MPI_Aint offsets[nitems] = { offsetof(newParams, size),
+		                             offsetof(newParams, components),
+		                             offsetof(newParams, offset),
+		                             offsetof(newParams, format) };
+		
+		MPI_CHECK(MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_np_type));
+		MPI_CHECK(MPI_Type_commit(&mpi_np_type));
+		MPI_CHECK(MPI_Bcast(&np, 1, mpi_np_type, 0, cartComm));
+		MPI_CHECK(MPI_Type_free(&mpi_np_type));
+		// resize
+		const I glPt[ALL_DIRS] = { RGCut<I>::numParts(X), RGCut<I>::numParts(Y), RGCut<I>::numParts(Z) };
+		setSizes(np.size, glPt, localPt, ghost, np.components);
 		// read data
 		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh));
-		MPI_CHECK(MPI_File_set_view(fh, offset * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
-		// slow implementation
-		// TODO check saveDataRequest
-		tda_ld.resize(
+		MPI_CHECK(MPI_File_set_view(fh, np.offset * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
+		tda.resize(
 			RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
 			RGCut<I>::partNodes(X, cartPos[X]), RGCut<I>::partNodes(Y, cartPos[Y]), RGCut<I>::partNodes(Z, cartPos[Z]),
 			RGCut<I>::partOrigin(X, cartPos[X]), RGCut<I>::partOrigin(Y, cartPos[Y]), RGCut<I>::partOrigin(Z, cartPos[Z]),
 			ghost[X], ghost[Y], ghost[Z],
 			nc
 		);
-		//MPI_CHECK(MPI_File_iread(fh, tda_ld.getDataRaw(), 1, arrayDt.at(cartRank), &saveDataRequest));
-		MPI_CHECK(MPI_File_read(fh, tda_ld.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
+		MPI_CHECK(MPI_File_read_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
 		
 	}
 	/* wait while all data will be loaded */
 	void loadDataEnd() {
-		//MPI_CHECK(MPI_Wait(&saveDataRequest, MPI_STATUS_IGNORE));
-		dac.setDArray(tda_ld, localPt[X], localPt[Y], localPt[Z]);
+		if (cartComm == MPI_COMM_NULL) return;
+		MPI_CHECK(MPI_File_read_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
+		dac.setDArray(tda, localPt[X], localPt[Y], localPt[Z]);
 		MPI_CHECK(MPI_File_close(&fh));
-		tda_ld.resize(0,0,0, 0,0,0, 0,0,0, 0,0,0, 0); // free memory
+		tda.resize(0,0,0, 0,0,0, 0,0,0, 0,0,0, 0); // free memory
 	}
 private:
 	MPI_File fh;
-	// request for saveDataBegin/saveDataEnd and loadDataBegin/loadDataEnd
-	MPI_Request saveDataRequest;
 	// datatypes for local array
 	std::vector<MPI_Datatype> locArrayDt;
 
@@ -201,11 +237,6 @@ private:
 
 	DArrayScatter(DArrayScatter const &);
 	DArrayScatter &operator=(DArrayScatter const &);
-
-	/* initialize common things for all constructors */
-	void init() {
-		viewType = MPI_DATATYPE_NULL;
-	}
 
 	/* generate types for scatter, gather */
 	void generateSubarrayTypes();
@@ -247,8 +278,8 @@ private:
 	MPI_Datatype viewType;
 	/* RGCut for local DArrayContainer */
 	RGCut<I> dacCut;
-	/* temp DArray for loadDataBegin/loadDataEnd */
-	DArray<T, I> tda_ld;
+	/* temp DArray for save/load */
+	DArray<T, I> tda;
 };
 
 template <typename T, typename I>
@@ -257,10 +288,16 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
                                    I const localPt[ALL_DIRS],
                                    I const ghost[ALL_DIRS],
                                    I const nc) {
+	this->nc = nc;
 	RGCut<I>::setCutParams(size, globalPt);
+	if (cartComm != MPI_COMM_NULL) {
+		rgmpi::commFree(cartComm);
+	}
 	rgmpi::cartCreate(cartComm, globalPt);
+	if (cartComm == MPI_COMM_NULL) return; // make stubs if we choose to take more processes later		
 	cartRank = rgmpi::commRank(cartComm);
 	rgmpi::cartCoords(cartComm, cartRank, cartPos);
+
 	// set neighbours ranks
 	for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) {
 		if (cartPos[d] == 0) {
@@ -290,12 +327,12 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
 	             localPt[Y],
 	             localPt[Z]
 	         );
-	this->nc = nc;
 	generateSubarrayTypes();
 }
 
 template <typename T, typename I>
 void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> const &da) {
+	if (cartComm == MPI_COMM_NULL) return;
 	std::vector<MPI_Request> req;
 	if (processRank == cartRank) {
 		RG_ASSERT(RGCut<I>::numNodes() == da.localSize(), "Wrong number of nodes");
@@ -333,6 +370,7 @@ void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> cons
 
 template <typename T, typename I>
 void DArrayScatter<T, I>::generateSubarrayTypes() {
+	if (cartComm == MPI_COMM_NULL) return;
 	releaseSubarrayTypes(subArrayDt);
 	releaseSubarrayTypes(arrayDt);
 	releaseSubarrayTypes(locArrayDt);
@@ -446,10 +484,12 @@ DArrayScatter<T, I>::~DArrayScatter() {
 	if (viewType != MPI_DATATYPE_NULL) {
 		rgmpi::freeSubarrayType(viewType);
 	}
+	rgmpi::commFree(cartComm);
 }
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::gatherAndGet(int processRank, DArray<T, I> &da) {
+	if (cartComm == MPI_COMM_NULL) return;
 	std::vector<MPI_Request> req;
 	if (processRank == cartRank) {
 		da.resize(
@@ -481,11 +521,13 @@ void DArrayScatter<T, I>::gatherAndGet(int processRank, DArray<T, I> &da) {
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::internalSync() {
+	if (cartComm == MPI_COMM_NULL) return;
 	dac.sync();
 }
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::fillGhost() {
+	if (cartComm == MPI_COMM_NULL) return;
 	for (CartSide s = SIDE_LEFT; s != SIDE_ALL; s = static_cast<CartSide>(s + 1))
 		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1))
 			if (neigh[s][d] == NO_NEIGHBOUR) {
@@ -507,6 +549,7 @@ void DArrayScatter<T, I>::fillGhost() {
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::externalSyncStart() {
+	if (cartComm == MPI_COMM_NULL) return;
 	for (CartSide s = SIDE_LEFT; s != SIDE_ALL; s = static_cast<CartSide>(s + 1))
 		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1))
 			if (neigh[s][d] != NO_NEIGHBOUR) {
@@ -535,6 +578,7 @@ void DArrayScatter<T, I>::externalSyncStart() {
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::externalSyncEnd() {
+	if (cartComm == MPI_COMM_NULL) return;
 	while (1) {
 		int index;
 		MPI_CHECK(MPI_Waitany(SIDE_ALL * ALL_DIRS, syncRecvReq, &index, MPI_STATUS_IGNORE));

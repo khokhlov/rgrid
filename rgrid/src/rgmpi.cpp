@@ -77,6 +77,13 @@ int commRank(MPI_Comm comm)
 	return rank;
 }
 
+void commFree(MPI_Comm& comm) 
+{
+	if (comm == MPI_COMM_NULL) return;
+	MPI_CHECK(MPI_Comm_free(&comm));
+	comm = MPI_COMM_NULL;
+}
+
 int groupSize(MPI_Group g)
 {
 	int size;

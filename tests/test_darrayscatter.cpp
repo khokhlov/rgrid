@@ -305,7 +305,7 @@ TEST_CASE("DArrayScatter IO - MPI save/load") {
 		int const lp[3] = { 1, 1, 1 };
 		int const ghost[3] = { 3, 0, 1 };
 		das.setSizes(size, gp, lp, ghost, 2);
-		das2.setSizes(size, gp, lp, ghost, 2);
+		das2.setParts(gp, lp, ghost);
 		
 		if (das.getInternalRank() == 0) {
 			rgrid::DArray<int, int> d1, d2, d3;

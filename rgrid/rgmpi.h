@@ -28,6 +28,7 @@ int worldRank();
 int worldSize();
 int commSize(MPI_Comm comm);
 int commRank(MPI_Comm comm);
+void commFree(MPI_Comm& comm);
 int groupSize(MPI_Group g);
 int groupRank(MPI_Group s);
 void forceFinalize();

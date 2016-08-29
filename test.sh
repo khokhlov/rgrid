@@ -1,7 +1,5 @@
 #!/bin/bash
 
-cd build_mpi
-
 echo "Running tests"
 ./test_darray
 ./test_pdim

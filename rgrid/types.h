@@ -57,7 +57,8 @@ bool operator!=(const Dim3D<T>& lhs, const Dim3D<T>& rhs) {
 
 namespace rgio {
 
-enum format { BINARY, TEXT };
+enum format { BINARY = 0, 
+              TEXT = 1 };
 
 } // namespace rgio
 
