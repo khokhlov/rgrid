@@ -50,18 +50,7 @@ void loadHeader(std::iostream& stream, Dim3D<I>& size, I& components, format& fm
 
 #ifdef USE_MPI
 
-long getLineMPI(MPI_File fh, std::string& str, char delim = '\n') {
-	str.clear();
-	char c;
-	long count = 0;
-	while (1) {
-		MPI_CHECK(MPI_File_read(fh, &c, 1, MPI_CHAR, MPI_STATUS_IGNORE));
-		++count;
-		if (c == delim) break;
-		str += c;
-	}
-	return count;
-}
+long getLineMPI(MPI_File fh, std::string& str, char delim = '\n');
 
 /*
  * load header using MPI by single process

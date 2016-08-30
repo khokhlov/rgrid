@@ -46,7 +46,11 @@ public:
 	void setParts(I const globalPt[ALL_DIRS],
 	              I const localPt[ALL_DIRS],
 	              I const ghost[ALL_DIRS]) {
-		setSizes(globalPt, globalPt, localPt, ghost, nc);
+		I size[3]; // stub
+		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) {
+			size[d] = globalPt[d] * localPt[d];
+		}
+		setSizes(size, globalPt, localPt, ghost, nc);
 	}
 	
 	/*
@@ -264,8 +268,8 @@ private:
 	std::vector<T> sendBuf[SIDE_ALL][ALL_DIRS];
 	std::vector<T> recvBuf[SIDE_ALL][ALL_DIRS];
 	/* request for external sync start and end */
-	MPI_Request syncSendReq[SIDE_ALL *ALL_DIRS];
-	MPI_Request syncRecvReq[SIDE_ALL *ALL_DIRS];
+	MPI_Request syncSendReq[SIDE_ALL * ALL_DIRS];
+	MPI_Request syncRecvReq[SIDE_ALL * ALL_DIRS];
 	/* value in neighbours array, if there is no neighbour */
 	static const I NO_NEIGHBOUR = -1;
 	/* parts in DArrayContainer */
@@ -292,6 +296,9 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
                                    I const localPt[ALL_DIRS],
                                    I const ghost[ALL_DIRS],
                                    I const nc) {
+	for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) {
+		RG_ASSERT(size[d] >= globalPt[d] * localPt[d], "Wrong grid partitioning");
+	}
 	this->nc = nc;
 	RGCut<I>::setCutParams(size, globalPt);
 	if (cartComm != MPI_COMM_NULL) {
@@ -339,7 +346,36 @@ void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> cons
 	if (cartComm == MPI_COMM_NULL) return;
 	std::vector<MPI_Request> req;
 	if (processRank == cartRank) {
-		// TODO call setSizes instead assert
+//		// send info about sizes to other processes
+//		struct newSizes {
+//			I size[ALL_DIRS];
+//			I nc;
+//		} ns;
+//		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d+1)) {
+//			ns.size[d] = da.localSize(d);
+//		}
+//		ns.nc = da.getNC();
+//		// send header info to other processes
+//		const int nitems = 2;
+//		const int blocklengths[nitems] = {ALL_DIRS, 1};
+//		const MPI_Datatype types[nitems] = {rgmpi::getMPItype<I>(), rgmpi::getMPItype<I>()};
+//		MPI_Datatype mpi_ns_type;
+//		MPI_Aint offsets[nitems] = { offsetof(newSizes, size),
+//		                             offsetof(newSizes, nc)};
+//		MPI_CHECK(MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_ns_type));
+//		MPI_CHECK(MPI_Type_commit(&mpi_ns_type));
+//		printf("before\n");
+//		MPI_CHECK(MPI_Bcast(&ns, 1, mpi_ns_type, processRank, cartComm));
+//		printf("after\n");
+//		MPI_CHECK(MPI_Type_free(&mpi_ns_type));
+//		// resize local DArrayContainers and create types
+//		I globalPt[ALL_DIRS] = { RGCut<I>::numParts(X),
+//		                         RGCut<I>::numParts(Y),
+//		                         RGCut<I>::numParts(Z) };
+//		I localPt[ALL_DIRS] = { dacCut.numParts(X),
+//		                        dacCut.numNodes(Y),
+//		                        dacCut.numNodes(Z) };
+//		setSizes(ns.size, globalPt, localPt, ghost, ns.nc);
 		RG_ASSERT(RGCut<I>::numNodes() == da.localSize(), "Wrong number of nodes");
 		req.resize(RGCut<I>::numParts());
 		// send parts to all processes
@@ -560,7 +596,7 @@ void DArrayScatter<T, I>::externalSyncStart() {
 			if (neigh[s][d] != NO_NEIGHBOUR) {
 				CartDir ort1, ort2;
 				ortDirs(d, ort1, ort2);
-				I bufSize = dacCut.partNodes(ort1, cartPos[ort1]) * dacCut.partNodes(ort2, cartPos[ort2]) * ghost[d];
+				I bufSize = dacCut.partNodes(ort1, cartPos[ort1]) * dacCut.partNodes(ort2, cartPos[ort2]) * ghost[d] * nc;
 				// start recv
 				recvBuf[s][d].resize(bufSize);
 				MPI_CHECK(MPI_Irecv(&recvBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
