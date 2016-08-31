@@ -9,25 +9,62 @@
 namespace rgrid {
 
 /**
- * DArrayContainer splits DArray to work with small parts
+ * \brief DArrayContainer splits DArray to work with small parts
+ * 
+ * One big DArray divided into smaller DArrays, so you can use OpenMP or OpenCL with them
+ * 
+ * \tparam T type of every grid node (i.e. double, float)
+ * \tparam I type of grid indexes (i.e. int, long)
  */
 template <typename T, typename I>
 class DArrayContainer : public RGCut<I> {
 public:
+	/**
+	 * Call rgrid::DArrayContainer<T, I>::setDArray(const DArray<T, I> &da, const I px, const I py, const I pz) if using this constructor for initialization
+	 */
 	DArrayContainer() : RGCut<I>() {}
+	/**
+	 * \brief Create DArrayContainer from existing DArray
+	 * \sa setDArray
+	 * \param[in] da DArray to split
+	 * \param[in] numParts number of parts
+	 */
 	DArrayContainer(const DArray<T, I> &da, const I numParts) : RGCut<I>() {
 		setDArray(da, numParts);
 	}
+	/**
+	 * \brief Create DArrayContainer from existing DArray
+	 * \param[in] da DArray to split
+	 * \param[in] px,py,pz num parts in (X,Y,Z) directions 
+	 */
 	DArrayContainer(const DArray<T, I> &da, const I px, const I py, const I pz) : RGCut<I>() {
 		setDArray(da, px, py, pz);
 	}
-
+	/**
+	 * \brief take DArray and divide into smaller DArrays in one dimension
+	 * \param[in] da DArray to split
+	 * \param[in] numParts number of parts
+	 */
 	void setDArray(const DArray<T, I> &da, const I numParts);
+	/**
+	 * \brief take DArray and divide into smaller DArrays in 3 dims
+	 * \param[in] da DArray to split
+	 * \param[in] px,py,pz num parts in (X,Y,Z) directions
+	 */
 	void setDArray(const DArray<T, I> &da, const I px, const I py, const I pz);
-
-	// get entire DArray
-	void getDArray(DArray<T, I> &) const;
-	// get specific part of DArray
+	/**
+	 * \brief Get entire DArray from parts in DArrayContainer
+	 * \param[out] da entire DArray
+	 */
+	void getDArray(DArray<T, I> &da) const;
+	/** 
+	 * \brief Get specific part of DArray.
+	 * 
+	 * Use this function if DArray splitted only in one dimension
+	 * 
+	 * \param[in] partNum number of part
+	 * \return DArray part
+	 */
 	DArray<T, I> &getDArrayPart(const I partNum) {
 		RG_ASSERT(dArray.size() > static_cast<size_t>(partNum), "Out of range");
 		return dArray.at(partNum);
@@ -36,16 +73,30 @@ public:
 		RG_ASSERT(dArray.size() > static_cast<size_t>(partNum), "Out of range");
 		return dArray.at(partNum);
 	}
+	/** 
+	 * \brief Get specific part of DArray.
+	 * 
+	 * Use this function if DArray splitted in 3 dimensions
+	 * 
+	 * \param[in] i,j,k numbers of parts in dimensions (X,Y,Z)
+	 * \return DArray part
+	 */
 	DArray<T, I> &getDArrayPart(const I i, const I j, const I k) {
 		return dArray.at(RGCut<I>::linInd(i, j, k));
 	}
 
+	/**
+	 * \brief Equivalent to getDArrayPart()
+	 */
 	DArray<T, I> &operator()(const I px, const I py, const I pz) {
 		return getDArrayPart(px, py, pz);
 	}
 
 	/**
-	 * return node in position (i, j, k) and number cn
+	 * \brief get node in entire DArray when it splitted
+	 * \param[in] i,j,k coordinates of nodes in dimensions (X,Y,Z)
+	 * \param[in] cn component number
+	 * \return node
 	 */
 	inline T &getNode(const I i, const I j, const I k, const I cn) {
 		I pn[ALL_DIRS] = { RGCut<I>::locatePart(X, i), RGCut<I>::locatePart(Y, j), RGCut<I>::locatePart(Z, k) };
@@ -54,41 +105,61 @@ public:
 	}
 
 	/**
-	 * copy rect region with size: sz, sy, sz and start: ox, oy, oz to buffer
+	 * \brief Copy rect region from entire DArrayContainer
+	 * 
+	 * \param[in] ox,oy,oz origins of rect region
+	 * \param[in] sx,sy,sz starts of rect region
+	 * \param[out] buffer rect region
 	 */
 	void getSubArray(I ox, I oy, I oz, I sx, I sy, I sz, std::vector<T> &buffer);
-	/**
-	 * copy rect region with size: sz, sy, sz and start: ox, oy, oz from buffer
-	 * buffer must contain sx * sy * sz * cn elements
+	/** 
+	 * \brief Copy rect region from entire DArrayContainer
+	 * \param[in] ox,oy,oz origins of rect region
+	 * \param[in] sx,sy,sz starts of rect region
+	 * \param[in] buffer rect region
+	 * \note buffer must contain sx * sy * sz * cn elements
 	 */
 	void setSubArray(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer);
 	/**
-	 * the same as setSubArray, but indexes can be in ghost nodes
+	 * \breif The same as setSubArray(), but indexes can be in ghost nodes of entire DArrayContainer
 	 */
 	void setSubArrayWithGhost(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer);
 	/**
-	 * fill boundary ghost nodes with values from nearest nodes
+	 * \brief Fill boundary ghost nodes with values from nearest nodes
 	 */
 	void fillGhost();
 	/**
-	 * fill fhost nodes of all DArray parts with values from adjacent DArrays
+	 * \brief fill fhost nodes of all DArray parts with values from adjacent DArrays
 	 */
 	void sync();
-
 	/**
-	 * write line (all nodes on X direction) with coordinates y and z into stream
+	 * \brief write all nodes in X direction into stream
+	 * 
+	 * \param[in] stream output stream
+	 * \param[in] cn number of component
+	 * \param[in] y,z coordiantes of line
+	 * \param[in] fmt writing format
 	 */
 	void writeLine(std::iostream &stream, const I cn, const I y, const I z, const rgio::format fmt) const;
-
+	/**
+	 * \brief save all DArrayContainer data into stream
+	 * 
+	 * \param[in] stream output stream
+	 * \param[in] fmt writing format
+	 */
 	void saveData(std::iostream &stream, const rgio::format fmt) const;
 
 #ifdef USE_OPENCL
 	/**
-	 * The same as fillGhost(), but without copy to host
+	 * \brief The same as fillGhost(), but without copy to host
+	 * 
+	 * When every DArray part on device it will work faster
 	 */
 	void fillGhostCL();
 	/**
-	 * The same as sync(), but without copy to host
+	 * \brief The same as sync(), but without copy to host
+	 * 
+	 * When every DArray part on device it will work faster
 	 */
 	void syncCL();
 #endif // USE_OPENCL

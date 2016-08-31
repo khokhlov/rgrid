@@ -18,9 +18,24 @@
 
 namespace rgrid {
 
+/**
+ * \brief Class for creation rectangular structures.
+ * 
+ * DArray is 3 dimensional structure and every node can have several components of same type.
+ * Also DArray can represent rectangular structure (subarray) inside bigger rectangular structure.
+ * So it have two sizes: global - size in bigger structure, local - size of current DArray.
+ * 
+ * DArray can have ghost nodes on edges for auxiliary purposes. Indexes of ghost nodes lay outside DArray.
+ * 
+ * \tparam T type of every grid node (i.e. double, float)
+ * \tparam I type of grid indexes (i.e. int, long)
+ */
 template <typename T, typename I>
 class DArray : public PDim<I> {
 public:
+	/**
+	 * Call resize() if you use this constructor
+	 */
 	DArray() : PDim<I>() {
 		init();
 		alloc();
@@ -28,6 +43,17 @@ public:
 
 public:
 
+	/**
+	 * \brief Set new sizes to DArray
+	 * 
+	 * The most verbose version
+	 * 
+	 * \param[in] x,y,z size of bigger rectangular structure
+	 * \param[in] px,py,pz size of current DArray
+	 * \param[in] ox,oy,oz origin of current DArray in bigger structure
+	 * \param[in] gx,gy,gz number of ghost nodes on each side
+	 * \param[in] cn number of components
+	 */
 	virtual void resize(const T x, const T y, const T z,
 	                    const T px, const T py, const T pz,
 	                    const T ox, const T oy, const T oz,
@@ -40,16 +66,34 @@ public:
 		PDim<I>::resize(p);
 		alloc();
 	}
+	/**
+	 * \brief Set new sizes to DArray
+	 * \param[in] x,y,z size of DArray
+	 * \param[in] cn number of components
+	 */
 	virtual void resize(const T x = 1, const T y = 1, const T z = 1, const T cn = 1) {
 		PDim<I>::resize(x, y, z, cn);
 		alloc();
 	}
+	/**
+	 * \brief Set new sizes to DArray
+	 * \param[in] x,y,z size of DArray
+	 * \param[in] gx,gy,gz number of ghost nodes on each side
+	 * \param[in] cn number of components
+	 */
 	virtual void resize(const T x, const T y, const T z,
 	                    const T gx, const T gy, const T gz,
 	                    const T cn) {
 		PDim<I>::resize(x, y, z, gx, gy, gz, cn);
 		alloc();
 	}
+	/**
+	 * \brief Set new sizes to DArray
+	 * 
+	 * \param[in] d1,d2,d3 different dimensions in any order
+	 * \param[in] s1,s2,s3 size of DArray in the same order as in d1,d2,d3
+	 * \param[in] cn number of components
+	 */
 	virtual void resize_d(const CartDir d1, const T s1, const CartDir d2, const T s2, const CartDir d3, const T s3, const T cn) {
 		PDim<I>::resize(d1, s1, d2, s2, d3, s3, cn);
 		alloc();
@@ -72,53 +116,115 @@ public:
 
 	~DArray();
 
+	/**
+	 * \brief Fill ghost nodes by values from adjacent nodes
+	 * \param[in] d direction
+	 * \param[in] s side
+	 */
 	void fillGhost(const CartDir d, const CartSide s);
+	/**
+	 * \brief Fill ghost nodes by values from adjacent nodes on both sides
+	 * \param[in] d direction
+	 */
 	void fillGhost(const CartDir d) {
 		fillGhost(d, SIDE_LEFT);
 		fillGhost(d, SIDE_RIGHT);
 	}
+	/**
+	 * \brief Fill all ghost nodes by values from adjacent nodes
+	 */
 	void fillGhost() {
 		fillGhost(X);
 		fillGhost(Y);
 		fillGhost(Z);
 	}
-
-	// copy ghost nodes from "da"
-	// "d" and "s" relative to this DArray
+	/** 
+	 * \brief Copy nodes from another DArray to this DArray.
+	 * 
+	 * Take edge nodes from another DArray and place them into this DArray
+	 * 
+	 * \param[in] da DArray to copy from
+	 * \param[in] d direction relative to this DArray
+	 * \param[in] s side relative to this DArray
+	 */
 	void copyGhost(DArray<T, I> &da, const CartDir d, const CartSide s);
-
+	/**
+	 * \brief Fill all DArray by one value
+	 * \param[in] v value to fill
+	 */
 	void fill(const T &v);
-
+	/**
+	 * \brief Get raw pointer to DArray nodes
+	 * \return pointer to nodes
+	 */
 	T *getDataRaw() {
 		return &data.at(0);
 	}
-
+	/**
+	 * \brief Get node component in internal linear array of nodes
+	 * \param[in] index index in internal array
+	 * \return node component
+	 */
 	T &operator[](const I index) {
 		return data[index];
 	}
+	
 	const T &operator[](const I index) const {
 		return data[index];
 	}
 
+	/** 
+	 * \brief Get node component at specified position in 3D DArray
+	 * \param[in] i,j,k coordinate
+	 * \param[in] cn component number
+	 * \return node component
+	 */
 	T &val(const I i, const I j, const I k, const I cn) {
 		return data.at(PDim<I>::ind(i, j, k, cn));
 	}
+	/** 
+	 * \brief Get node component at specified position in 2D DArray
+	 * \param[in] i,j coordinate
+	 * \param[in] cn component number
+	 * \return node component
+	 */
 	T &val(const I i, const I j, const I cn) {
 		return val(i, j, static_cast<T>(0), cn);
 	}
+	/** 
+	 * \brief Get node component at specified position in 1D DArray
+	 * \param[in] i coordinate
+	 * \param[in] cn component number
+	 * \return node component
+	 */
 	T &val(const I i, const I cn) {
 		return val(i, static_cast<T>(0), cn);
 	}
+	/** 
+	 * \brief Get node component at specified position in 3D DArray
+	 * \param[in] d1,d2,d3 different coordinates in any order
+	 * \param[in] i1,i2,i3 components in coordinates order
+	 * \param[in] cn component number
+	 * \return node component
+	 */
 	T &val(const I i1, const CartDir d1, const I i2, const CartDir d2, const I i3, const CartDir d3, const I cn) {
 		return data[PDim<I>::ind(i1, d1, i2, d2, i3, d3, cn)];
 	}
-
+	/**
+	 * \brief Equivalent to val()
+	 */
 	T &operator()(const I i, const I j, const I k, const I cn) {
 		return val(i, j, k, cn);
 	}
+	/**
+	 * \brief Equivalent to val()
+	 */
 	T &operator()(const I i, const I j, const I cn) {
 		return val(i, j, cn);
 	}
+	/**
+	 * \brief Equivalent to val()
+	 */
 	T &operator()(const I i, const I cn) {
 		return val(i, cn);
 	}
@@ -132,65 +238,116 @@ public:
 	const T &operator()(const I i, const I cn) const {
 		return val(i, cn);
 	}
-
+	/**
+	 * \brief Size of entire DArray in memory
+	 */
 	I dataSize() const {
 		return data.size();
 	}
 
-	// write line (all nodes on X direction) with coordinates y and z into stream
+	/** 
+	 * \brief Read all nodes in X direction from stream
+	 * \param[in] stream
+	 * \param[in] cn component number
+	 * \param[in] y,z coordinates of all nodes in X direction
+	 * \param[in] fmt format
+	 */
 	void readLine(std::iostream &stream, const I cn, const I y, const I z, const rgio::format fmt);
 
-	// write line (all nodes on X direction) with coordinates y and z into stream
+	/** 
+	 * \brief Write all nodes in X direction into stream
+	 * \param[in] stream
+	 * \param[in] cn component number
+	 * \param[in] y,z coordinates of all nodes in X direction
+	 * \param[in] fmt format
+	 */
 	void writeLine(std::iostream &stream, const I cn, const I y, const I z, const rgio::format fmt) const;
 
+	/**
+	 * \brief Load DArray from stream
+	 * \param[in] stream
+	 */
 	void loadData(std::iostream &stream);
 
+	/**
+	 * \brief Save DArray into stream
+	 * \param[in] stream
+	 * \param[in] fmt format
+	 */
 	void saveData(std::iostream &stream, const rgio::format fmt) const;
 
-	/*
-	 * write data to buffer,
-	 * start with position "start"
-	 * return number of written elements
-	 * TODO implement
+	/**
+	 * \brief Write data to buffer starting with some position
+	 * \param[out] buffer
+	 * \param[in] start initial position in buffer
+	 * \param[in] fmt format
+	 * \return number of written elements
+	 * \todo not implemented
 	 */
 	typename std::vector<char>::size_type
 	saveData(std::vector<char> &buffer, typename std::vector<char>::size_type start, const rgio::format fmt) const;
 
 #ifdef USE_OPENCL
 public:
-	/* make copy to ghost nodes of this DArray from DArray da
-	 * when both DArrays placed on device 
-	 * if event is NULL perform blocking copy, 
-	 * otherwise return event which user have to wait and perform asynchronous copy */
+	/** 
+	 * \brief OpenCL implementation of copyGhost()
+	 * 
+	 * Make copy to ghost nodes of this DArray from another DArray
+	 * \note Both DArrays have to be placed on device. 
+	 * If event is NULL perform blocking copy, 
+	 * otherwise return event which user have to wait and perform asynchronous copy
+	 * \param[in] da DArray to copy from
+	 * \param[in] d direction
+	 * \param[in] s side
+	 * \param[in,out] event if event is NULL perform blocking copy, otherwise return event which user have to wait and perform asynchronous copy
+	 */
 	void copyGhostCL(DArray<T, I> &da, const CartDir &d, const CartSide &s, cl_event* event = NULL);
 
-	// the same as fill ghost, but working on device
+	/** 
+	 * \brief OpenCL implementation of fillGhost()
+	 */
 	void fillGhostCL(const CartDir &d, const CartSide &s);
 
-	/* Set OpenCL context to work with buffer */
+	/** 
+	 * \brief Set OpenCL context to work with buffer 
+	 */
 	void setCLContext(cl_context context);
 
-	/* Set OpenCL command queue */
+	/** 
+	 * \brief Set OpenCL command queue
+	 */
 	void setCLCQ(cl_command_queue cq);
 
-	/* Get OpenCL data buffer to work in kernels
+	/** 
+	 * \brief OpenCL data buffer to work in kernels
+	 * 
 	 * clHtoD() and clDtoH() uses this buffer
-	 * You must run setCLContext() and setCLCQ() before */
+	 * \note You must run setCLContext() and setCLCQ() before
+	 */
 	cl_mem &getCLBuffer();
 
-	/* Get second temporary buffer with the same size as first buffer to improve performaPDim<I>::getNC()
-	 * You must run setCLContext() and setCLCQ() before */
+	/**
+	 * \brief Get second temporary buffer with the same size as first buffer 
+	 * Second buffer helps to work with OpenCL
+	 * \note You must run setCLContext() and setCLCQ() before 
+	 */
 	cl_mem &getCLBuffer2();
 
-	/* swap first and second buffers */
+	/**
+	 * \brief Swap first and second buffers 
+	 */
 	void swapCLBuffers() {
 		std::swap(clBuffer, clBuffer2);
 	}
 
-	/* copy data from host to device */
+	/** 
+	 * \brief Copy data from host to device 
+	 */
 	void clHtoD();
 
-	/* copy data from device to host */
+	/** 
+	 * \brief Copy data from device to host 
+	 */
 	void clDtoH();
 
 private:
