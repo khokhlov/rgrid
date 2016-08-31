@@ -109,7 +109,9 @@ struct PDimRaw {
 
 	CartDim dim() const;
 
-	/* get number of components */
+	/**
+	 * get number of components
+	 */
 	T getNC() const {
 		return m_nc;
 	};
@@ -118,7 +120,9 @@ struct PDimRaw {
 		return isEqualNoGhost(rhs) && (m_ghost_size == rhs.m_ghost_size);
 	}
 	
-	// is equal without ghost check
+	/** 
+	 * is equal without ghost check
+	 */
 	bool isEqualNoGhost(const PDimRaw<T>& rhs) const {
 		const PDimRaw<T>& lhs = *this;
 		const bool is1 = lhs.m_global_size == rhs.m_global_size;
@@ -137,11 +141,13 @@ struct PDimRaw {
 	Dim3D<T> m_local_stride;
 
 	Dim3D<T> m_ghost_size;
-	Dim3D<T> m_local_ghost_size; /* m_local_ghost_size = m_local_size + 2 * m_ghost_size */
+	/** m_local_ghost_size = m_local_size + 2 * m_ghost_size */
+	Dim3D<T> m_local_ghost_size;
 	T m_local_ghost_size_all;
 	Dim3D<T> m_origin;
-
-	T m_nc; /* number of components */
+	
+	/** number of components */
+	T m_nc; 
 }; // PDimRaw
 
 template <typename T>

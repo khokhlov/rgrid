@@ -11,14 +11,25 @@
 #ifdef USE_MPI
 namespace rgrid {
 
-/*
- * DArrayScatter splits DArray into parts, send them to different processes and synchronize them
+/**
+ * \brief DArrayScatter represents grid with two partitioning steps
+ * 
+ * First step is global partitioning - MPI.
+ * DArrayScatter contains one DArrayContainer on each process.
+ * 
+ * Second step is local partitioning - OpenMP, OpenCL, etc.
+ * Each local DArrayContainer contains DArrays.
+ * 
+ * \tparam T type of every grid node (i.e. double, float)
+ * \tparam I type of grid indexes (i.e. int, long)
  */
 template <typename T, typename I>
 class DArrayScatter : public RGCut<I> {
 public:
-	/*
-	 * Use setSizes() if you create object by this constructor
+	/**
+	 * \brief Default constructor, one global and one local part
+	 * 
+	 * To make more parts call setParts() before loading grid into DArrayScatter
 	 */
 	DArrayScatter() : cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL) 
 	{
@@ -29,19 +40,53 @@ public:
 		I const nc = 1;
 		setSizes(size, globalPt, localPt, ghost, nc);
 	};
+	
+	/**
+	 * \brief The most verbose constructor: grid size and partitioning
+	 * 
+	 * \note It's better to use DArrayScatter(I const globalPt[ALL_DIRS], I const localPt[ALL_DIRS], I const ghost[ALL_DIRS]) instead
+	 * \param[in] size number of nodes of entire grid
+	 * \param[in] globalPt number of global parts (MPI processes in each direction)
+	 * \param[in] localPt number of local parts (DArray's in local DArrayContainer), can be different on different MPI processes
+	 * \param[in] ghost number of ghost nodes on each side of grid
+	 * \param[in] nc number of type T variables in each grid node
+	 */
 	DArrayScatter(I const size[ALL_DIRS],
 	              I const globalPt[ALL_DIRS],
 	              I const localPt[ALL_DIRS],
 	              I const ghost[ALL_DIRS],
 	              I const nc) 
-		: cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL) 
+		: cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL)
 	{
 		setSizes(size, globalPt, localPt, ghost, nc);
 	};
+	
+	/**
+	 * \brief Constructor with grid partitioning
+	 * 
+	 * \param[in] globalPt number of global parts (MPI processes in each direction)
+	 * \param[in] localPt number of local parts (DArray's in local DArrayContainer), can be different on different MPI processes
+	 * \param[in] ghost number of ghost nodes on each side of grid
+	 */
+	DArrayScatter(I const globalPt[ALL_DIRS],
+	              I const localPt[ALL_DIRS],
+	              I const ghost[ALL_DIRS])
+		: cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL)
+	{
+		setParts(globalPt, localPt, ghost);
+	}
+	
 	~DArrayScatter();
 	
-	/*
-	 * specify global parts (MPI), local parts (OpenCL) and ghost
+	/**
+	 * \brief Set grid partitioning
+	 * 
+	 * Call to this function causes creation of MPI communicator with cartesian topology
+	 * with dimensions specified in globalPt. All processes in MPI_COMM_WORLD call this function.
+	 * 
+	 * \param[in] globalPt number of global parts (MPI processes in each direction)
+	 * \param[in] localPt number of local parts (DArray's in local DArrayContainer), can be different on different MPI processes
+	 * \param[in] ghost number of ghost nodes on each side of grid
 	 */
 	void setParts(I const globalPt[ALL_DIRS],
 	              I const localPt[ALL_DIRS],
@@ -53,97 +98,156 @@ public:
 		setSizes(size, globalPt, localPt, ghost, nc);
 	}
 	
-	/*
-	 * Set all sizes, use setParts instead this function
-	 * size is number of nodes in each direction
-	 * globalPt is number of process parts, must be the same on all processes and
-	 * globalPt[X] * globalPt[Y] * globalPt[Z] == size of processes in MPI_COMM_WORLD
-	 * localPt - number of local parts in each direction, can be different on defferent processes
-	 * ghost - number of ghost nodes
-	 * nc - number of components
+	/**
+	 * \brief Set grid size and partitioning
+	 * 
+	 * \note It's better to use setParts(I const globalPt[ALL_DIRS], I const localPt[ALL_DIRS], I const ghost[ALL_DIRS]) instead
+	 * \param[in] size number of nodes of entire grid
+	 * \param[in] globalPt number of global parts (MPI processes in each direction)
+	 * \param[in] localPt number of local parts (DArray's in local DArrayContainer), can be different on different MPI processes
+	 * \param[in] ghost number of ghost nodes on each side of grid
+	 * \param[in] nc number of type T variables in each grid node
 	 */
 	void setSizes(I const size[ALL_DIRS],
 	              I const globalPt[ALL_DIRS],
 	              I const localPt[ALL_DIRS],
 	              I const ghost[ALL_DIRS],
 	              I const nc);
-	/*
-	 * get local container, use this when DArray scattered
+	/**
+	 * \brief Get local part of grid
+	 * 
+	 * Get local container when grid loaded
+	 * 
+	 * \return DArrayContainer which represents local part of entire grid
 	 */
 	DArrayContainer<T, I> &getLocalContainer() {
 		return dac;
 	}
-	/*
-	 * Scatter DArray from process with rank == processRank in cart comm
-	 * All processes in cart comm call this function
-	 * da - array to scatter
-	 * processes with rank != processRank set dummy DArray in da that remains unchanged
+	/**
+	 * \brief Scatter DArray from one process to all
+	 * 
+	 * Process which rank == processRank divides own DArray da into parts and
+	 * sends them to other processes. 
+	 * All processes call this function, but processes with rank != processRank 
+	 * set dummy DArray in da which is not used.
+	 * 
+	 * \note Load grid by loadDataBegin when there are 
+	 * not enough memory to save entire grid on one process
+	 * 
+	 * \param[in] processRank rank of process to scatter from
+	 * \param[in] da DArray to scatter
 	 */
 	void setAndScatter(int const processRank, DArray<T, I> const &da);
-	/*
-	 * Gather DArray to process with rank == processRank in cart comm
-	 * All processes in cart comm call this function
-	 * process with rank == processRank receive full DArray in da,
-	 * da on other processes remains unchanged
+	/**
+	 * \brief Gather DArray from all processes to one
+	 * 
+	 * Gather DArray to process with rank == processRank 
+	 * All processes call this function. Process with rank == processRank 
+	 * receive full DArray in da, da on other processes remains unchanged.
+	 * 
+	 * \param[in] processRank rank of process to gather to
+	 * \param[out] da DArray to gather
 	 */
 	void gatherAndGet(int const processRank, DArray<T, I> &da);
-	/*
-	 * fill ghost nodes of local DArrays in local DArrayContainer by
+	/**
+	 * \brief Synchronization inside local DArrayContainer
+	 * 
+	 * Fill ghost nodes of local DArrays in local DArrayContainer by
 	 * copying them from other DArrays inside local DArrayContainer
 	 */
 	void internalSync();
-	/*
-	 * start to receive ghost nodes for local DArrays in local
+	/**
+	 * \brief Synchronization between DArrayContainers on different processes
+	 * 
+	 * Start to receive ghost nodes for local DArrays in local
 	 * DArrayContainer from other processes
+	 * 
+	 * \warning Don't use ghost nodes before call to rgrid::DArrayScatter< T, I >::externalSyncEnd()
+	 * 
+	 * \sa externalSyncEnd
 	 */
 	void externalSyncStart();
-	/*
-	 * wait until all data will be received and written in ghost nodes of local DArrays
+	/**
+	 * \brief Synchronization between DArrayContainers on different processes
+	 * 
+	 * Wait until all data will be received and written in ghost nodes of local DArrays
+	 * 
+	 * \sa externalSyncStart
 	 */
 	void externalSyncEnd();
-	/*
-	 * fill ghost nodes of local DArrays in local DArrayContainer with
-	 * values from boundary nodes
+	/**
+	 * \brief Fill local ghost nodes with values from boundary nodes
+	 * 
+	 * Local ghost nodes on the edge of entire grid will be filled.
 	 */
 	void fillGhost();
-	/* get rank in internal cart comm */
+	/**
+	 * \brief Get rank in internal communicator
+	 * \return rank of current process in internal cartesian communicator
+	 */
 	int getInternalRank() const {
 		return cartRank;
 	}
-	/* get position of current process in cart comm */
+	/**
+	 * \brief Get position in internal communicator
+	 * \param[in] d direction
+	 * \return position of current process in cartesian communicator in direction d
+	 */
 	int getInternalPos(CartDir d) {
 		return cartPos[d];
 	}
-	/* get number of components */
+	/**
+	 * \brief Get number of components
+	 * \return number of components in each node
+	 */
 	I getNC() const {
 		return nc;
 	}
-	/* get number of ghost nodes */
+	/**
+	 * \brief Get number of ghost nodes
+	 * \param[in] d direction
+	 * \return number of ghost nodes in direction d
+	 */
 	I getGhost(CartDir d) const {
 		return ghost[d];
 	}
-	/* get type for file view in IO operations */
+	/**
+	 * \brief Get type for file view in MPI IO operations
+	 * \return file view type
+	 */
 	MPI_Datatype fileViewType() const {
 		return viewType;
 	}
-	/* return local DArrayContainer */
-	DArrayContainer<T, I> &getDAC() {
-		return dac;
-	}
-	/* get type for darray with indexes x, y, z */
+	/**
+	 * \brief Get MPI type for DArray.
+	 * \details This type is subarray type of DArray with coordinates (x, y, z) in entire grid.
+	 * \return type for darray with indexes (x, y, z)
+	 */
 	MPI_Datatype getDArrayDt(I x, I y, I z) const {
 		return arrayDt.at(RGCut<I>::linInd(x, y, z));
 	}
-	/* get DArray with indexes x, y, z in local DArrayContainer */
+	/**
+	 * \brief Get DArray from local DarrayContainer
+	 * \return DArray with indexes (x, y, z) in local DArrayContainer 
+	 */
 	DArray<T, I> &getDArrayPart(I x, I y, I z) {
 		return dac.getDArrayPart(x, y, z);
 	}
-	/* get buffer of DArray with indexes x, y, z in local DArrayContainer */
+	/**
+	 * \brief Get buffer of DArray with indexes (x, y, z) in local DArrayContainer
+	 * \return pointer to raw data
+	 */
 	T *getDArrayBuffer(I x, I y, I z) {
 		return &dac.getDArrayPart(x, y, z)[0];
 	}
-	/* start saving data to file */
-	// TODO: fmt does nothing
+	/**
+	 * \brief Start saving entire grid to file
+	 * \param[in] filename name of output file
+	 * \param[in] fmt format of file
+	 * \todo support for TEXT format
+	 * \warning Don't modify grid data before call to rgrid::DArrayScatter< T, I >::saveDataEnd
+	 * \sa saveDataEnd
+	 */
 	void saveDataBegin(std::string filename, const rgio::format fmt) {
 		if (cartComm == MPI_COMM_NULL) return;
 		std::stringstream ss;
@@ -165,14 +269,22 @@ public:
 		dac.getDArray(tda);
 		MPI_CHECK(MPI_File_write_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
 	}
-	/* Wait while all data will be saved */
+	/** 
+	 * \brief Wait while all data will be saved
+	 * \sa saveDataBegin
+	 */
 	void saveDataEnd() {
 		if (cartComm == MPI_COMM_NULL) return;
 		MPI_CHECK(MPI_File_write_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
 		MPI_CHECK(MPI_File_close(&fh));
 	}
-	/* start loading data from file */
-	// TODO: fmt does nothing
+	/** 
+	 * \brief Start loading data from file 
+	 * \todo support for TEXT format
+	 * \param[in] filename name of input file
+	 * \warning Don't modify grid data before call to rgrid::DArrayScatter< T, I >::loadDataEnd
+	 * \sa loadDataEnd
+	 */
 	void loadDataBegin(std::string filename) {
 		if (cartComm == MPI_COMM_NULL) return;
 		std::fstream fs;
@@ -222,7 +334,10 @@ public:
 		MPI_CHECK(MPI_File_read_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
 		
 	}
-	/* wait while all data will be loaded */
+	/**
+	 * \brief Wait while all data will be loaded
+	 * \sa loadDataBegin
+	 */
 	void loadDataEnd() {
 		if (cartComm == MPI_COMM_NULL) return;
 		MPI_CHECK(MPI_File_read_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));

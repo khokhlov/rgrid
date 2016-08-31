@@ -4,8 +4,6 @@
 #include "rgrid/utils.h"
 #include <iostream>
 
-//#define USE_OPENCL
-
 #ifdef USE_OPENCL
 
 #include <CL/opencl.h>

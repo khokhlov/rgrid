@@ -10,7 +10,7 @@
 
 namespace clwrapper {
 
-/*
+/**
  * Make all aviable devices ready to use
  * platforms <=> contexts
  * platform contains devices
@@ -25,24 +25,36 @@ public:
 		return instance;
 	}
 	
-	// return context for specific platform with all devices
+	/**
+	 * return context for specific platform with all devices
+	 */
 	const cl_context& getContext (unsigned platformNum = 0) const;
 	
-	// return command queue for specific context (the same as platform number) and device
+	/** 
+	 * return command queue for specific context (the same as platform number) and device
+	 */
 	const cl_command_queue& getCommandQueue (unsigned deviceNum = 0, unsigned contextNum = 0) const;
 	
-	// return device for specific platform
+	/** 
+	 * return device for specific platform
+	 */
 	const cl_device_id& getDevice(unsigned deviceNum = 0, unsigned platformNum = 0) const;
 		
-	// return number of platforms
+	/** 
+	 * return number of platforms
+	 */
 	unsigned getPlatformsNum() const { return platformsNum; }
 	
-	// return number of devices for specific platform
+	/** 
+	 * return number of devices for specific platform
+	 */
 	unsigned getDevicesNum(unsigned platform = 0) const;
 	
 private:
 	
-	// initialization of command queue and context
+	/** 
+	 * initialization of command queue and context
+	 */
 	CLWrapper();	
 	CLWrapper(const CLWrapper&);
 	CLWrapper& operator=(const CLWrapper&);

@@ -8,7 +8,7 @@
 
 namespace rgrid {
 
-/*
+/**
  * DArrayContainer splits DArray to work with small parts
  */
 template <typename T, typename I>
@@ -44,46 +44,50 @@ public:
 		return getDArrayPart(px, py, pz);
 	}
 
-	// return node in position (i, j, k) and number cn
+	/**
+	 * return node in position (i, j, k) and number cn
+	 */
 	inline T &getNode(const I i, const I j, const I k, const I cn) {
 		I pn[ALL_DIRS] = { RGCut<I>::locatePart(X, i), RGCut<I>::locatePart(Y, j), RGCut<I>::locatePart(Z, k) };
 		I idx[ALL_DIRS] = { RGCut<I>::locateIndex(X, i), RGCut<I>::locateIndex(Y, j), RGCut<I>::locateIndex(Z, k) };
 		return getDArrayPart(pn[X], pn[Y], pn[Z]).val(idx[X], idx[Y], idx[Z], cn);
 	}
 
-	/*
+	/**
 	 * copy rect region with size: sz, sy, sz and start: ox, oy, oz to buffer
 	 */
 	void getSubArray(I ox, I oy, I oz, I sx, I sy, I sz, std::vector<T> &buffer);
-	/*
+	/**
 	 * copy rect region with size: sz, sy, sz and start: ox, oy, oz from buffer
 	 * buffer must contain sx * sy * sz * cn elements
 	 */
 	void setSubArray(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer);
-	/*
+	/**
 	 * the same as setSubArray, but indexes can be in ghost nodes
 	 */
 	void setSubArrayWithGhost(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer);
-	/*
+	/**
 	 * fill boundary ghost nodes with values from nearest nodes
 	 */
 	void fillGhost();
-	/*
+	/**
 	 * fill fhost nodes of all DArray parts with values from adjacent DArrays
 	 */
 	void sync();
 
-	// write line (all nodes on X direction) with coordinates y and z into stream
+	/**
+	 * write line (all nodes on X direction) with coordinates y and z into stream
+	 */
 	void writeLine(std::iostream &stream, const I cn, const I y, const I z, const rgio::format fmt) const;
 
 	void saveData(std::iostream &stream, const rgio::format fmt) const;
 
 #ifdef USE_OPENCL
-	/*
+	/**
 	 * The same as fillGhost(), but without copy to host
 	 */
 	void fillGhostCL();
-	/*
+	/**
 	 * The same as sync(), but without copy to host
 	 */
 	void syncCL();
