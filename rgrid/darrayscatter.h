@@ -301,6 +301,7 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
 	}
 	this->nc = nc;
 	RGCut<I>::setCutParams(size, globalPt);
+	MPI_CHECK(MPI_Barrier(MPI_COMM_WORLD)); // wait before destroy communicator
 	if (cartComm != MPI_COMM_NULL) {
 		rgmpi::commFree(cartComm);
 	}
@@ -345,37 +346,37 @@ template <typename T, typename I>
 void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> const &da) {
 	if (cartComm == MPI_COMM_NULL) return;
 	std::vector<MPI_Request> req;
+	// send info about sizes to other processes
+	struct newSizes {
+		I size[ALL_DIRS];
+		I nc;
+	} ns;
 	if (processRank == cartRank) {
-//		// send info about sizes to other processes
-//		struct newSizes {
-//			I size[ALL_DIRS];
-//			I nc;
-//		} ns;
-//		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d+1)) {
-//			ns.size[d] = da.localSize(d);
-//		}
-//		ns.nc = da.getNC();
-//		// send header info to other processes
-//		const int nitems = 2;
-//		const int blocklengths[nitems] = {ALL_DIRS, 1};
-//		const MPI_Datatype types[nitems] = {rgmpi::getMPItype<I>(), rgmpi::getMPItype<I>()};
-//		MPI_Datatype mpi_ns_type;
-//		MPI_Aint offsets[nitems] = { offsetof(newSizes, size),
-//		                             offsetof(newSizes, nc)};
-//		MPI_CHECK(MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_ns_type));
-//		MPI_CHECK(MPI_Type_commit(&mpi_ns_type));
-//		printf("before\n");
-//		MPI_CHECK(MPI_Bcast(&ns, 1, mpi_ns_type, processRank, cartComm));
-//		printf("after\n");
-//		MPI_CHECK(MPI_Type_free(&mpi_ns_type));
-//		// resize local DArrayContainers and create types
-//		I globalPt[ALL_DIRS] = { RGCut<I>::numParts(X),
-//		                         RGCut<I>::numParts(Y),
-//		                         RGCut<I>::numParts(Z) };
-//		I localPt[ALL_DIRS] = { dacCut.numParts(X),
-//		                        dacCut.numNodes(Y),
-//		                        dacCut.numNodes(Z) };
-//		setSizes(ns.size, globalPt, localPt, ghost, ns.nc);
+		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d+1)) {
+			ns.size[d] = da.localSize(d);
+		}
+		ns.nc = da.getNC();
+	}
+	// send header info to other processes
+	const int nitems = 2;
+	const int blocklengths[nitems] = {ALL_DIRS, 1};
+	const MPI_Datatype types[nitems] = {rgmpi::getMPItype<I>(), rgmpi::getMPItype<I>()};
+	MPI_Datatype mpi_ns_type;
+	MPI_Aint offsets[nitems] = { offsetof(newSizes, size),
+	                             offsetof(newSizes, nc)};
+	MPI_CHECK(MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_ns_type));
+	MPI_CHECK(MPI_Type_commit(&mpi_ns_type));
+	MPI_CHECK(MPI_Bcast(&ns, 1, mpi_ns_type, processRank, cartComm));
+	MPI_CHECK(MPI_Type_free(&mpi_ns_type));
+	// resize local DArrayContainers and create types
+	I globalPt[ALL_DIRS] = { RGCut<I>::numParts(X),
+	                         RGCut<I>::numParts(Y),
+	                         RGCut<I>::numParts(Z) };
+	I localPt[ALL_DIRS] = { dacCut.numParts(X),
+	                        dacCut.numParts(Y),
+	                        dacCut.numParts(Z) };
+	setSizes(ns.size, globalPt, localPt, ghost, ns.nc);
+	if (processRank == cartRank) {
 		RG_ASSERT(RGCut<I>::numNodes() == da.localSize(), "Wrong number of nodes");
 		req.resize(RGCut<I>::numParts());
 		// send parts to all processes

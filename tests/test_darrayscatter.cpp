@@ -383,11 +383,10 @@ TEST_CASE("DArrayScatter external sync 2") {
 	if (rgmpi::worldSize() == 3 * 4 * 5) {
 	
 		rgrid::DArrayScatter<int, int> das;
-		int const size[3] = { 17, 50, 6 };
 		int const gp[3] = { 3, 4, 5 };
 		int const lp[3] = { 2, 1, 1 };
 		int const ghost[3] = { 3, 0, 1 };
-		das.setSizes(size, gp, lp, ghost, 2);
+		das.setParts(gp, lp, ghost);
 		
 		rgrid::DArray<int, int> d1;
 		
