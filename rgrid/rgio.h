@@ -1,3 +1,8 @@
+/**
+ * \file
+ * \brief Input/output operations
+ */
+
 #ifndef RG_IO_H
 #define RG_IO_H
 
@@ -10,12 +15,12 @@ namespace rgrid {
 
 namespace rgio {
 
-/*
- * basic header loader
- * stream - IN
- * size - OUT array of sizes in header
- * components - OUT number of comonents
- * format - OUT
+/**
+ * \brief Basic header loader (own DArray format)
+ * \param[in] stream
+ * \param[out] size array of sizes in header
+ * \param[out] components number of comonents
+ * \param[out] fmt format
  */
 template <typename I>
 void loadHeader(std::iostream& stream, Dim3D<I>& size, I& components, format& fmt) {
@@ -50,11 +55,21 @@ void loadHeader(std::iostream& stream, Dim3D<I>& size, I& components, format& fm
 
 #ifdef USE_MPI
 
+/**
+ * \brief read one line from file opened by single process
+ * \param[in] fh file handler
+ * \param[out] str string
+ * \param[out] delim symbol to stop reading
+ */
 long getLineMPI(MPI_File fh, std::string& str, char delim = '\n');
 
-/*
- * load header using MPI by single process
- * return offset of data in file
+/**
+ * \brief Load header using MPI by single process
+ * \return offset of data in file
+ * \param[in] filename
+ * \param[out] size array of sizes in header
+ * \param[out] components number of comonents
+ * \param[out] fmt format
  */
 template <typename I>
 long loadHeaderMPI(const std::string& filename, Dim3D<I>& size, I& components, format& fmt) {
@@ -99,8 +114,12 @@ long loadHeaderMPI(const std::string& filename, Dim3D<I>& size, I& components, f
 
 #endif
 
-/*
- * basic header saver
+/**
+ * \brief Basic header saver (own DArray format)
+ * \param[out] stream
+ * \param[in] size
+ * \param[in] components
+ * \param[in] fmt format
  */
 template <typename I>
 void writeHeader(std::iostream& stream, const Dim3D<I>& size, const I components, const format fmt) {

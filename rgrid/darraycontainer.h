@@ -1,3 +1,8 @@
+/**
+ * \file
+ * \brief One partitioning (local) step for DArray
+ */
+
 #ifndef DARRAY_CONTAINER_H
 #define DARRAY_CONTAINER_H
 
@@ -69,6 +74,9 @@ public:
 		RG_ASSERT(dArray.size() > static_cast<size_t>(partNum), "Out of range");
 		return dArray.at(partNum);
 	}
+	/**
+	 * \sa rgrid::DArray<T, I>::getDArrayPart(const I partNum)
+	 */
 	const DArray<T, I> &getDArrayPart(const I partNum) const {
 		RG_ASSERT(dArray.size() > static_cast<size_t>(partNum), "Out of range");
 		return dArray.at(partNum);
@@ -121,7 +129,7 @@ public:
 	 */
 	void setSubArray(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer);
 	/**
-	 * \breif The same as setSubArray(), but indexes can be in ghost nodes of entire DArrayContainer
+	 * \brief The same as setSubArray(), but indexes can be in ghost nodes of entire DArrayContainer
 	 */
 	void setSubArrayWithGhost(I ox, I oy, I oz, I sx, I sy, I sz, const std::vector<T> &buffer);
 	/**

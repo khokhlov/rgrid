@@ -1,3 +1,8 @@
+/**
+ * \file
+ * \brief MPI related functions
+ */
+
 /*
  * Author: Nikolay Khokhlov <k_h@inbox.ru>, (C) 2015
  */
@@ -12,6 +17,7 @@
 #ifdef USE_MPI
 #include <mpi.h>
 
+/// Check for errors in execution of MPI functions
 #define MPI_CHECK(x) \
 	{ int rc = x; \
 	if (rc != MPI_SUCCESS) RG_ASSERT(rc == MPI_SUCCESS, STR(#x) + ": " + rgmpi::getError(rc)); }
@@ -20,26 +26,96 @@
 namespace rgmpi
 {
 	
+/** 
+ * \brief Get MPI error by code
+ */
 std::string getError(const int rc);
+/**
+ * \brief Init MPI
+ * \param[out] argc get number of command line args
+ * \param[out] argv get command line args
+ */
 void init(int *argc, char ***argv);
+/**
+ * \brief Init MPI
+ */
 void init();
+/** 
+ * \brief Init MPI
+ * \return Is MPI already initialized
+ */
 bool forceInit();
+/**
+ * \brief Get rank of process in MPI_COMM_WORLD
+ */
 int worldRank();
+/**
+ * \brief Get size of MPI_COMM_WORLD
+ */
 int worldSize();
+/**
+ * \brief Get size of communicator
+ */
 int commSize(MPI_Comm comm);
+/**
+ * \brief Get rank of current process in communicator
+ */
 int commRank(MPI_Comm comm);
+/**
+ * \brief Free communicator
+ */
 void commFree(MPI_Comm& comm);
+/**
+ * \brief Get group size
+ */
 int groupSize(MPI_Group g);
+/**
+ * \brief Get group rank
+ */
 int groupRank(MPI_Group s);
+/**
+ * \brief Finilize MPI
+ */
 void forceFinalize();
+/**
+ * \brief Synchronize all processes in MPI_COMM_WORLD
+ */
 void barrier();
+/**
+ * \brief Create cart comm from MPI_COMM_WORLD communicator
+ * \param[out] cartComm
+ * \param[in] parts number of parts in each direction
+ */
 void cartCreate(MPI_Comm& cartComm, int const parts[3]);
+/**
+ * \brief Get coords of process with specific rank in cart comm
+ * \param[in] cartComm
+ * \param[in] rank
+ * \param[out] coords
+ */
 void cartCoords(MPI_Comm const cartComm, int const rank, int coords[3]);
+/**
+ * \brief Get rank of process with specific coords in cart comm
+ * \param[in] cartComm
+ * \param[in] coords
+ * \return rank
+ */
 int cartRank(MPI_Comm const cartComm, int const coords[3]);
 
+/**
+ * \brief get MPI type corresponding to specific type
+ * \tparam T specific type
+ */
 template <typename T>
 MPI_Datatype getMPItype();
 
+/**
+ * \brief Create subarray type (array inside bigger array)
+ * \param[in] gsize global size (size of bigger array)
+ * \param[in] lsize local size (size of internal array)
+ * \param[in] start origins of local array in global array
+ * \tparam T types for each element of array
+ */
 template <typename T>
 MPI_Datatype createSubarrayType(int gsize[4], int lsize[4], int start[4]) {
 	int igsize[4] = { gsize[3], gsize[2], gsize[1], gsize[0] };
@@ -54,6 +130,9 @@ MPI_Datatype createSubarrayType(int gsize[4], int lsize[4], int start[4]) {
 	return dt;
 }
 
+/**
+ * \brief Release subarray type
+ */
 void freeSubarrayType(MPI_Datatype& dt);
 
 };

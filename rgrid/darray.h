@@ -1,3 +1,8 @@
+/**
+ * \file
+ * \brief Creation of rectangular structures
+ */
+
 /*
  * Author: Nikolay Khokhlov <k_h@inbox.ru>, (C) 2015
  */
@@ -62,6 +67,9 @@ public:
 		PDim<I>::resize(x, y, z, px, py, pz, ox, oy, oz, gx, gy, gz, cn);
 		alloc();
 	}
+	/**
+	 * \brief resize this PDim as the other PDim
+	 */
 	virtual void resize(const PDim<I> &p) {
 		PDim<I>::resize(p);
 		alloc();
@@ -168,7 +176,11 @@ public:
 	T &operator[](const I index) {
 		return data[index];
 	}
-	
+	/**
+	 * \brief Get node component in internal linear array of nodes
+	 * \param[in] index index in internal array
+	 * \return node component
+	 */
 	const T &operator[](const I index) const {
 		return data[index];
 	}
@@ -228,13 +240,21 @@ public:
 	T &operator()(const I i, const I cn) {
 		return val(i, cn);
 	}
-
+	/**
+	 * \brief Equivalent to val()
+	 */
 	const T &operator()(const I i, const I j, const I k, const I cn) const {
 		return data[PDim<I>::ind(i, j, k, cn)];
 	}
+	/**
+	 * \brief Equivalent to val()
+	 */
 	const T &operator()(const I i, const I j, const I cn) const {
 		return val(i, j, cn);
 	}
+	/**
+	 * \brief Equivalent to val()
+	 */
 	const T &operator()(const I i, const I cn) const {
 		return val(i, cn);
 	}
@@ -492,6 +512,7 @@ void DArray<T, I>::loadData(std::iostream &stream) {
 	}
 }
 
+/// Check is two DArrays equal
 template <typename T, typename I>
 bool operator==(const DArray<T, I> &lhs, const DArray<T, I> &rhs) {
 	if (&lhs == &rhs) {

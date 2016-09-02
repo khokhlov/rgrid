@@ -1,3 +1,8 @@
+/**
+ * \file
+ * \brief resize abilities for sizes of DArray
+ */
+
 /*
  * Author: Nikolay Khokhlov <k_h@inbox.ru>, (C) 2015
  */
@@ -11,28 +16,87 @@
 
 namespace rgrid {
 
+/**
+ * \brief This class responsible for sizes of DArrays
+ * 
+ * This class has the same behaviour as PDimRaw, but support easier way for resizing
+ * 
+ * \tparam T type of indexes (i.e. int, long)
+ * \sa DArray
+ */
 template <typename T>
 struct PDim : public PDimRaw<T> {
+	/**
+	 * \brief Set new sizes to rectangular structure
+	 * 
+	 * The most verbose version
+	 * 
+	 * \param[in] x,y,z size of bigger rectangular structure
+	 * \param[in] px,py,pz size of current DArray
+	 * \param[in] ox,oy,oz origin of current DArray in bigger structure
+	 * \param[in] gx,gy,gz number of ghost nodes on each side
+	 * \param[in] cn number of components
+	 */
 	virtual void resize(const T x, const T y, const T z,
 	                    const T px, const T py, const T pz,
 	                    const T ox, const T oy, const T oz,
 	                    const T gx, const T gy, const T gz,
 	                    const T cn);
+	/**
+	 * \brief Set sizes the same as in other PDim
+	 */
 	virtual void resize(const PDim<T> &p);
+	/**
+	 * \brief Set new sizes to rectangular structure
+	 * 
+	 * \param[in] x,y,z size of bigger rectangular structure
+	 * \param[in] cn number of components
+	 */
 	virtual void resize(const T x, const T y, const T z, const T cn);
+	/**
+	 * \brief Set new sizes to rectangular structure
+	 * 
+	 * \param[in] x,y,z size of bigger rectangular structure
+	 * \param[in] gx,gy,gz number of ghost nodes on each side
+	 * \param[in] cn number of components
+	 */
 	virtual void resize(const T x, const T y, const T z,
 	                    const T gx, const T gy, const T gz,
 	                    const T cn);
+	/**
+	 * \brief Set new sizes to rectangular structure
+	 * 
+	 * \param[in] d1,d2,d3 different dimensions in any order
+	 * \param[in] s1,s2,s3 size of DArray in the same order as in d1,d2,d3
+	 * \param[in] cn number of components
+	 */
 	virtual void resize_d(const CartDir d1, const T s1, const CartDir d2, const T s2, const CartDir d3, const T s3, const T cn);
 
+	/**
+	 * Default ghost size if it is not specified
+	 */
 	const static T s_ghost_size = 2;
 
 	PDim(): PDimRaw<T>() {
 	}
-	
+	/**
+	 * \param[in] x,y,z size of bigger rectangular structure
+	 * \param[in] cn number of components
+	 */
 	PDim(const T x, const T y = 1, const T z = 1, const T cn = 1) : PDimRaw<T>() {
 		resize(x, y, z, x, y, z, 0, 0, 0, 0, 0, 0, cn);
 	}
+	/**
+	 * \brief Set new sizes to rectangular structure
+	 * 
+	 * The most verbose constructor 
+	 * 
+	 * \param[in] x,y,z size of bigger rectangular structure
+	 * \param[in] px,py,pz size of current DArray
+	 * \param[in] ox,oy,oz origin of current DArray in bigger structure
+	 * \param[in] gx,gy,gz number of ghost nodes on each side
+	 * \param[in] cn number of components
+	 */
 	PDim(const T x, const T y, const T z,
 	     const T px, const T py, const T pz,
 	     const T ox, const T oy, const T oz,
@@ -40,9 +104,15 @@ struct PDim : public PDimRaw<T> {
 	     const T cn) : PDimRaw<T>() {
 		resize(x, y, z, px, py, pz, ox, oy, oz, gx, gy, gz, cn);
 	}
+	/**
+	 * \brief Set sizes of this PDim as sizes of other PDim
+	 */
 	PDim(const PDim<T> &rhs) : PDimRaw<T>()  {
 		resize(rhs);
 	}
+	/**
+	 * \brief Set sizes of this PDim as sizes of other PDim
+	 */
 	PDim<T> &operator=(const PDim<T> &rhs) {
 		resize(rhs);
 		return *this;

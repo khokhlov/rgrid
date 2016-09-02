@@ -1,3 +1,8 @@
+/**
+ * \file
+ * \brief Two partitioning steps (local and global) of DArray
+ */
+
 #ifndef DARRAY_SCATTER_H
 #define DARRAY_SCATTER_H
 

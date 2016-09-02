@@ -1,7 +1,10 @@
+/**
+ * \file
+ * \brief Wrapper to OpenCL
+ */
+
 #ifndef CL_WRAPPER_H
 #define CL_WRAPPER_H
-
-//#define USE_OPENCL
 
 #ifdef USE_OPENCL
 
@@ -11,14 +14,21 @@
 namespace clwrapper {
 
 /**
- * Make all aviable devices ready to use
- * platforms <=> contexts
- * platform contains devices
- * devices <=> command queues
+ * \brief Wrap all OpenCL stuff
+ * 
+ * Make all aviable OpenCL devices (GPUs) ready to use.
+ * Each OpenCL platform (AMD, NVIDIA, Intel) corresponds to one OpenCL context.
+ * Single platform can contain multiple devices.
+ * Each device corresponds to one OpenCL command queue.
  */
 class CLWrapper
 {
 public:
+	/**
+	 * \brief Get single instance of this class
+	 * \details This is the only way to get CLWrapper
+	 * \return instance of CLWrapper
+	 */
 	static const CLWrapper& instance()
 	{
 		static CLWrapper instance;
@@ -26,33 +36,46 @@ public:
 	}
 	
 	/**
-	 * return context for specific platform with all devices
+	 * \brief Get OpenCL context
+	 * \details In most cases there is only one OpenCL implementation on one machine,
+	 * so there is only one platform
+	 * \param[in] platformNum number of platform 
+	 * \return context for specific platform with all devices
 	 */
 	const cl_context& getContext (unsigned platformNum = 0) const;
 	
 	/** 
-	 * return command queue for specific context (the same as platform number) and device
+	 * \brief Get OpenCL command queue
+	 * \param[in] deviceNum number of device on specific platform
+	 * \param[in] contextNum number of this specific context(platform) 
+	 * \return OpenCL command queue for specific context (the same as platform number) and device
 	 */
 	const cl_command_queue& getCommandQueue (unsigned deviceNum = 0, unsigned contextNum = 0) const;
 	
 	/** 
-	 * return device for specific platform
+	 * \brief Get OpenCL representation of device
+	 * \param[in] deviceNum number of device on specific platform
+	 * \param[in] platformNum number of this specific platform
+	 * \return device for specific platform
 	 */
 	const cl_device_id& getDevice(unsigned deviceNum = 0, unsigned platformNum = 0) const;
 		
 	/** 
-	 * return number of platforms
+	 * \brief Get number of detected platforms
+	 * \return number of platforms
 	 */
 	unsigned getPlatformsNum() const { return platformsNum; }
 	
 	/** 
-	 * return number of devices for specific platform
+	 * \brief Get number of detected devices on specific platform
+	 * \param[in] platform
+	 * \return number of devices for specific platform
 	 */
 	unsigned getDevicesNum(unsigned platform = 0) const;
 	
 private:
 	
-	/** 
+	/* 
 	 * initialization of command queue and context
 	 */
 	CLWrapper();	
