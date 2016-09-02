@@ -19,19 +19,21 @@ include_directories(${OpenCL_INCLUDE_DIRS})
 set(EXTRA_LIBS ${EXTRA_LIBS} ${OpenCL_LIBRARIES})
 endif(USE_OPENCL)
 
-add_library(rgrid SHARED ${RGRID})
+add_library(RGrid SHARED ${RGRID})
+add_library(RGridStatic STATIC ${RGRID})
 
 add_executable(test_darray tests/test_darray.cpp)
-target_link_libraries(test_darray rgrid ${EXTRA_LIBS})
+target_link_libraries(test_darray RGrid ${EXTRA_LIBS})
 
 add_executable(test_darraycontainer tests/test_darraycontainer.cpp)
-target_link_libraries(test_darraycontainer rgrid ${EXTRA_LIBS})
+target_link_libraries(test_darraycontainer RGrid ${EXTRA_LIBS})
 
 add_executable(test_darrayscatter tests/test_darrayscatter.cpp)
-target_link_libraries(test_darrayscatter rgrid ${EXTRA_LIBS})
+target_link_libraries(test_darrayscatter RGrid ${EXTRA_LIBS})
 
 add_executable(test_pdim tests/test_pdim.cpp)
-target_link_libraries(test_pdim rgrid ${EXTRA_LIBS})
+target_link_libraries(test_pdim RGrid ${EXTRA_LIBS})
 
 add_executable(test_clwrapper tests/test_clwrapper.cpp)
-target_link_libraries(test_clwrapper rgrid ${EXTRA_LIBS})
+target_link_libraries(test_clwrapper RGrid ${EXTRA_LIBS})
+
