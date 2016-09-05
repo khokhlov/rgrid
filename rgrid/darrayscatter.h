@@ -464,6 +464,10 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
 
 template <typename T, typename I>
 void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> const &da) {
+	/// \todo for every da create new subarray types
+	if (cartRank == processRank) {
+		RG_ASSERT(da.ghost(X) == ghost[X] && da.ghost(Z) == ghost[Z] && da.ghost(Z) == ghost[Z], "ghost nodes have to be equal");
+	}
 	if (cartComm == MPI_COMM_NULL) return;
 	std::vector<MPI_Request> req;
 	// send info about sizes to other processes
@@ -523,11 +527,11 @@ void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> cons
 	    ghost[X], ghost[Y], ghost[Z],
 	    nc);
 	MPI_CHECK(MPI_Recv(&tda[0], 1, arrayDt[cartRank], processRank, SCATTER, cartComm, MPI_STATUS_IGNORE));
-	dac.setDArray(tda, localPt[X], localPt[Y], localPt[Z]);
 	if (processRank == cartRank) {
 		// wait while all parts will be received
 		MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
 	}
+	dac.setDArray(tda, localPt[X], localPt[Y], localPt[Z]);
 }
 
 template <typename T, typename I>

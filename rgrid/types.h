@@ -92,9 +92,31 @@ namespace rgio {
 
 /**
  * \brief Formats in which data can be stored in file
+ * 
+ * Header of DARRAY data format described here
+ * \code{.unparsed}
+ * # DARRAY DATA FORMAT
+ * SIZE: X Y Z
+ * COMPONENTS: C
+ * FORMAT: format
+ * DATA START
+ * \endcode
+ * 'SIZE' is 3 numbers - 'X Y Z'. 'COMPONENTS' is the number of values inside node. 'FORMAT' can be 'binary' or 'text'.
+ * After 'DATA START' placed all the data in binary format or in text format(values divided by spaces).
+ * Number of values is X*Y*Z*C. Values placed in the next order: line of X, plane of Y, volume of Z, and after that in the same order volumes for next components.
+ * 
+ * Example:
+ * \code{.unparsed}
+ * # DARRAY DATA FORMAT
+ * SIZE: 5 10 1
+ * COMPONENTS: 3
+ * FORMAT: binary
+ * DATA START
+ * \endcode
  */
-enum format { BINARY = 0, 
-              TEXT = 1 };
+enum format { BINARY, ///< own DARRAY binary format
+              TEXT, ///< own DARRAY text format
+};
 
 } // namespace rgio
 

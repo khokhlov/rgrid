@@ -59,11 +59,11 @@ public:
 	 * \param[in] gx,gy,gz number of ghost nodes on each side
 	 * \param[in] cn number of components
 	 */
-	virtual void resize(const T x, const T y, const T z,
-	                    const T px, const T py, const T pz,
-	                    const T ox, const T oy, const T oz,
-	                    const T gx, const T gy, const T gz,
-	                    const T cn) {
+	virtual void resize(const I x, const I y, const I z,
+	                    const I px, const I py, const I pz,
+	                    const I ox, const I oy, const I oz,
+	                    const I gx, const I gy, const I gz,
+	                    const I cn) {
 		PDim<I>::resize(x, y, z, px, py, pz, ox, oy, oz, gx, gy, gz, cn);
 		alloc();
 	}
@@ -79,7 +79,7 @@ public:
 	 * \param[in] x,y,z size of DArray
 	 * \param[in] cn number of components
 	 */
-	virtual void resize(const T x = 1, const T y = 1, const T z = 1, const T cn = 1) {
+	virtual void resize(const I x = 1, const I y = 1, const I z = 1, const I cn = 1) {
 		PDim<I>::resize(x, y, z, cn);
 		alloc();
 	}
@@ -89,9 +89,9 @@ public:
 	 * \param[in] gx,gy,gz number of ghost nodes on each side
 	 * \param[in] cn number of components
 	 */
-	virtual void resize(const T x, const T y, const T z,
-	                    const T gx, const T gy, const T gz,
-	                    const T cn) {
+	virtual void resize(const I x, const I y, const I z,
+	                    const I gx, const I gy, const I gz,
+	                    const I cn) {
 		PDim<I>::resize(x, y, z, gx, gy, gz, cn);
 		alloc();
 	}
@@ -102,7 +102,7 @@ public:
 	 * \param[in] s1,s2,s3 size of DArray in the same order as in d1,d2,d3
 	 * \param[in] cn number of components
 	 */
-	virtual void resize_d(const CartDir d1, const T s1, const CartDir d2, const T s2, const CartDir d3, const T s3, const T cn) {
+	virtual void resize_d(const CartDir d1, const I s1, const CartDir d2, const I s2, const CartDir d3, const I s3, const I cn) {
 		PDim<I>::resize(d1, s1, d2, s2, d3, s3, cn);
 		alloc();
 	}
