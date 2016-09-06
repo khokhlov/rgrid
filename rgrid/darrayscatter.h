@@ -253,7 +253,7 @@ public:
 	 * \warning Don't modify grid data before call to rgrid::DArrayScatter< T, I >::saveDataEnd
 	 * \sa saveDataEnd
 	 */
-	void saveDataBegin(std::string filename, const rgio::format fmt) {
+	void saveDataBegin(std::string filename, const rgio::format fmt	) {
 		if (cartComm == MPI_COMM_NULL) return;
 		std::stringstream ss;
 		Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
@@ -527,11 +527,11 @@ void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> cons
 	    ghost[X], ghost[Y], ghost[Z],
 	    nc);
 	MPI_CHECK(MPI_Recv(&tda[0], 1, arrayDt[cartRank], processRank, SCATTER, cartComm, MPI_STATUS_IGNORE));
+	dac.setDArray(tda, localPt[X], localPt[Y], localPt[Z]);
 	if (processRank == cartRank) {
 		// wait while all parts will be received
 		MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
 	}
-	dac.setDArray(tda, localPt[X], localPt[Y], localPt[Z]);
 }
 
 template <typename T, typename I>
@@ -699,15 +699,15 @@ void DArrayScatter<T, I>::fillGhost() {
 			if (neigh[s][d] == NO_NEIGHBOUR) {
 				CartDir ort1, ort2;
 				ortDirs(d, ort1, ort2);
-				I k = (s == SIDE_LEFT) ? 0 : RGCut<I>::numParts(d) - 1;
-				for (I i = 0; i < RGCut<I>::numParts(ort1); i++)
-					for (I j = 0; j < RGCut<I>::numParts(ort2); j++) {
+				I k = (s == SIDE_LEFT) ? 0 : dac.numParts(d) - 1;
+				for (I i = 0; i < dac.numParts(ort1); i++)
+					for (I j = 0; j < dac.numParts(ort2); j++) {
 						I coord[ALL_DIRS];
 						coord[d] = k;
 						coord[ort1] = i;
 						coord[ort2] = j;
 						I x = coord[X], y = coord[Y], z = coord[Z];
-						DArray<T, I> da = dac.getDArrayPart(x, y, z);
+						DArray<T, I>& da = dac.getDArrayPart(x, y, z);
 						da.fillGhost(d, s);
 					}
 			}
@@ -721,20 +721,22 @@ void DArrayScatter<T, I>::externalSyncStart() {
 			if (neigh[s][d] != NO_NEIGHBOUR) {
 				CartDir ort1, ort2;
 				ortDirs(d, ort1, ort2);
-				I bufSize = dacCut.partNodes(ort1, cartPos[ort1]) * dacCut.partNodes(ort2, cartPos[ort2]) * ghost[d] * nc;
+				I bufSize = dac.numNodes(ort1) * dac.numNodes(ort2) * ghost[d] * nc;
 				// start recv
 				recvBuf[s][d].resize(bufSize);
 				MPI_CHECK(MPI_Irecv(&recvBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
 				// start send
+				// now we have many DA inside DAC and we want to get ghost plane from DAC,
+				// so we have to combine ghost planes from every DA placed on the border of local DAC
 				// sub array size and position
 				I orig[ALL_DIRS] = { 0, 0, 0 };
 				I size[ALL_DIRS] = {
-					dacCut.partNodes(X, cartPos[X]),
-					dacCut.partNodes(Y, cartPos[Y]),
-					dacCut.partNodes(Z, cartPos[Z]),
+					dac.numNodes(X),
+					dac.numNodes(Y),
+					dac.numNodes(Z),
 				};
 				size[d] = ghost[d];
-				orig[d] = (s == SIDE_LEFT) ? 0 : dacCut.numNodes(d) - ghost[d];
+				orig[d] = (s == SIDE_LEFT) ? 0 : dac.numNodes(d) - ghost[d];
 				dac.getSubArray(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], sendBuf[s][d]);
 				MPI_CHECK(MPI_Isend(&sendBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncSendReq[s + d * SIDE_ALL]));
 			} else {
@@ -759,12 +761,12 @@ void DArrayScatter<T, I>::externalSyncEnd() {
 		// sub array size and position
 		I orig[ALL_DIRS] = { 0, 0, 0 };
 		I size[ALL_DIRS] = {
-			dacCut.partNodes(X, cartPos[X]),
-			dacCut.partNodes(Y, cartPos[Y]),
-			dacCut.partNodes(Z, cartPos[Z]),
+			dac.numNodes(X),
+			dac.numNodes(Y),
+			dac.numNodes(Z),
 		};
 		size[d] = ghost[d];
-		orig[d] = (s == SIDE_LEFT) ? -ghost[d] : dacCut.numNodes(d);
+		orig[d] = (s == SIDE_LEFT) ? -ghost[d] : dac.numNodes(d);
 		dac.setSubArrayWithGhost(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], recvBuf[s][d]);
 	}
 	MPI_CHECK(MPI_Waitall(SIDE_ALL * ALL_DIRS, syncSendReq, MPI_STATUSES_IGNORE));
