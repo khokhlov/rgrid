@@ -23,9 +23,9 @@ inline real le_max3(real a, real b, real c) { return le_max(a, le_max(b, c)); }
 
 inline real& gind(real* grid, int_t x, int_t y, int_t c, int_t nx, int_t ny, int_t cn) {
 #ifdef USE_AOS
-    return grid[c + x * cn + y * cn * nx];
+	return grid[c + x * cn + y * cn * nx];
 #else // USE_SOA
-    return grid[x + y * nx + c * nx * ny];
+	return grid[x + y * nx + c * nx * ny];
 #endif
 }
 #define ind(x,y,nx) ((x) + (y) * (nx))
@@ -74,37 +74,16 @@ void le_set_ball(le_task &t, const le_vec2 c, const real r, const real s)
 	}
 }
 
-
-/*
- * Write float to file and reverse byte order.
- */
-void write_float(FILE* f, const float v)
-{
-	union {
-		float f;
-		unsigned char b[4];
-	} dat1, dat2;
-	dat1.f = v;
-	dat2.b[0] = dat1.b[3];
-	dat2.b[1] = dat1.b[2];
-	dat2.b[2] = dat1.b[1];
-	dat2.b[3] = dat1.b[0];
-	fwrite(dat2.b, sizeof(unsigned char), 4, f);
-}
-
 void le_init_task(le_task &task, const real dt, const le_vec2 h, const le_material mat, const le_point2 n)
 {
 	task.dt  = dt;
 	task.h   = h;
 	task.mat = mat;
 	task.n   = n;
-	//task.grid = (real*) malloc(sizeof(real) * NODE_SIZE * n.x * n.y);
-	//memset(task.grid, 0, NODE_SIZE * n.x * n.y);
 }
 
 void le_free_task(le_task& task)
 {
-	//free(task.grid);
 }
 
 int le_save_task(le_task &t, const char *file)
@@ -127,7 +106,7 @@ int le_save_task(le_task &t, const char *file)
 	ss << "SCALARS v float 1" << std::endl;
 	ss << "LOOKUP_TABLE v_table" << std::endl;
 
-	DA& ds = t.dasSave.getDArrayPart(0, 0, 0);
+	DA_F& ds = t.dasSave.getDArrayPart(0, 0, 0);
 	DAC& dac = t.das.getLocalContainer();
 	for (int_t k = 0; k != dac.numParts(rgrid::Z); ++k)
 	for (int_t j = 0; j != dac.numParts(rgrid::Y); ++j)

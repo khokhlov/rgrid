@@ -26,6 +26,10 @@ typedef rgrid::DArrayScatter<real, int_t> DAS;
 typedef rgrid::DArrayContainer<real, int_t> DAC;
 typedef rgrid::DArray<real, int_t> DA;
 
+typedef rgrid::DArrayScatter<float, int_t> DAS_F;
+typedef rgrid::DArrayContainer<float, int_t> DAC_F;
+typedef rgrid::DArray<float, int_t> DA_F;
+
 /* 2d vector struct. */
 typedef struct {
 	real x, y;
@@ -101,7 +105,7 @@ typedef struct {
 	/* Grid data (nodes). */
 	DA da; // initialization
 	DAS das;
-	DAS dasSave;
+	DAS_F dasSave;
 } le_task;
 
 /*
