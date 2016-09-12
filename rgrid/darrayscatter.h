@@ -761,24 +761,56 @@ void DArrayScatter<T, I>::externalSyncStart() {
 			if (neigh[s][d] != NO_NEIGHBOUR) {
 				CartDir ort1, ort2;
 				ortDirs(d, ort1, ort2);
-				I bufSize = dac.numNodes(ort1) * dac.numNodes(ort2) * ghost[d] * nc;
-				// start recv
-				recvBuf[s][d].resize(bufSize);
-				MPI_CHECK(MPI_Irecv(&recvBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
-				// start send
-				// now we have many DA inside DAC and we want to get ghost plane from DAC,
-				// so we have to combine ghost planes from every DA placed on the border of local DAC
-				// sub array size and position
-				I orig[ALL_DIRS] = { 0, 0, 0 };
-				I size[ALL_DIRS] = {
-					dac.numNodes(X),
-					dac.numNodes(Y),
-					dac.numNodes(Z),
-				};
-				size[d] = ghost[d];
-				orig[d] = (s == SIDE_LEFT) ? 0 : dac.numNodes(d) - ghost[d];
-				dac.getSubArray(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], sendBuf[s][d]);
-				MPI_CHECK(MPI_Isend(&sendBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncSendReq[s + d * SIDE_ALL]));
+				if (dac.numParts(ort1) == 1 && dac.numParts(ort2) == 1) {
+					// optimized synchronization without temporary buffer when there are no local partitioning
+					
+					// current DArray
+					Dim3D<I> locIdx(0, 0, 0);
+					locIdx[d] = (s == SIDE_LEFT) ? 0 : dac.numParts(d) - 1;
+					DArray<T,I>& cda = dac.getDArrayPart(locIdx.x, locIdx.y, locIdx.z);
+					// TODO don't generate types in every sync
+					int sizes[4] = {
+						cda.localGhostSize(X),
+						cda.localGhostSize(Y),
+						cda.localGhostSize(Z),
+						nc
+					};
+					int subsizes[4] = { 0, 0, 0, nc };
+					subsizes[d] = ghost[d];
+					subsizes[ort1] = cda.localSize(ort1);
+					subsizes[ort2] = cda.localSize(ort2);
+					int starts[4] = { ghost[X], ghost[Y], ghost[Z], 0 };
+					// types for ghost nodes in current DArray (recv to this nodes)
+					starts[d] = (s == SIDE_LEFT) ? 0 : cda.localGhostSize(d) - ghost[d];
+					MPI_Datatype ghostDT = rgmpi::createSubarrayType<T>(sizes, subsizes, starts);
+					// types for boundary (not ghost) nodes in current DArray (send from this nodes)
+					starts[d] = (s == SIDE_LEFT) ? ghost[d] : cda.localGhostSize(d) - 2 * ghost[d];
+					MPI_Datatype boundDT = rgmpi::createSubarrayType<T>(sizes, subsizes, starts);
+					
+					MPI_CHECK(MPI_Irecv(cda.getDataRaw(), 1, ghostDT, neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
+					MPI_CHECK(MPI_Isend(cda.getDataRaw(), 1, boundDT, neigh[s][d], SYNC, cartComm, &syncSendReq[s + d * SIDE_ALL]));
+				} else {
+					I bufSize = dac.numNodes(ort1) * dac.numNodes(ort2) * ghost[d] * nc;
+					// start recv
+					recvBuf[s][d].resize(bufSize);
+					MPI_CHECK(MPI_Irecv(&recvBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
+					// start send
+					
+					// now we have many DA inside DAC and we want to get ghost plane from DAC,
+					// so we have to combine ghost planes from every DA placed on the border of local DAC
+					
+					// sub array size and position
+					I orig[ALL_DIRS] = { 0, 0, 0 };
+					I size[ALL_DIRS] = {
+						dac.numNodes(X),
+						dac.numNodes(Y),
+						dac.numNodes(Z),
+					};
+					size[d] = ghost[d];
+					orig[d] = (s == SIDE_LEFT) ? 0 : dac.numNodes(d) - ghost[d];
+					dac.getSubArray(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], sendBuf[s][d]);
+					MPI_CHECK(MPI_Isend(&sendBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncSendReq[s + d * SIDE_ALL]));
+				}
 			} else {
 				syncRecvReq[s + d * SIDE_ALL] = MPI_REQUEST_NULL;
 				syncSendReq[s + d * SIDE_ALL] = MPI_REQUEST_NULL;
@@ -798,16 +830,21 @@ void DArrayScatter<T, I>::externalSyncEnd() {
 		CartDir d = static_cast<CartDir>(index / SIDE_ALL);
 		CartDir ort1, ort2;
 		ortDirs(d, ort1, ort2);
-		// sub array size and position
-		I orig[ALL_DIRS] = { 0, 0, 0 };
-		I size[ALL_DIRS] = {
-			dac.numNodes(X),
-			dac.numNodes(Y),
-			dac.numNodes(Z),
-		};
-		size[d] = ghost[d];
-		orig[d] = (s == SIDE_LEFT) ? -ghost[d] : dac.numNodes(d);
-		dac.setSubArrayWithGhost(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], recvBuf[s][d]);
+		
+		if (dac.numParts(ort1) == 1 && dac.numParts(ort2) == 1) {
+			// nothing to do, optimized synchronization
+		} else {
+			// sub array size and position
+			I orig[ALL_DIRS] = { 0, 0, 0 };
+			I size[ALL_DIRS] = {
+				dac.numNodes(X),
+				dac.numNodes(Y),
+				dac.numNodes(Z),
+			};
+			size[d] = ghost[d];
+			orig[d] = (s == SIDE_LEFT) ? -ghost[d] : dac.numNodes(d);
+			dac.setSubArrayWithGhost(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], recvBuf[s][d]);
+		}
 	}
 	MPI_CHECK(MPI_Waitall(SIDE_ALL * ALL_DIRS, syncSendReq, MPI_STATUSES_IGNORE));
 }

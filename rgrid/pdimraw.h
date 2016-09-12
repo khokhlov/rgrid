@@ -102,7 +102,7 @@ struct PDimRaw {
 	}
 
 	/**
-	 * \brief Get number of ghost nodes on specific side where nodes in other directions have sizes of local rect structure
+	 * \brief Get number of all nodes in current rectangular structure in specific direction includding ghost nodes
 	 * \param[in] d direction
 	 * \return Number of nodes
 	 */
@@ -110,7 +110,7 @@ struct PDimRaw {
 		return m_local_ghost_size[d];
 	}
 	/**
-	 * \brief Get number of all ghost nodes in local rect struct
+	 * \brief Get number of all nodes in local rect struct including ghost nodes
 	 * \return Number of nodes
 	 */
 	T localGhostSize() const {
@@ -439,3 +439,4 @@ T PDimRaw<T>::localToIJK(const T index, const CartDir dir) {
 } // namesace rgrid
 
 #endif // RG_PDIM_RAW_H
+

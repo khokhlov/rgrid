@@ -542,16 +542,14 @@ bool operator==(const DArray<T, I> &lhs, const DArray<T, I> &rhs) {
 template <typename T, typename I>
 void DArray<T, I>::inverseBytes() {
 	RG_ASSERT(sizeof(unsigned char) == 1, "Always true");
-	union {
-		T f;
-		unsigned char b[sizeof(T)];
-	} oldVal, newVal;
+	T newVal;
+	unsigned char* newValP = (unsigned char*)(&newVal);
 	for (typename std::vector<T>::size_type i = 0; i != data.size(); ++i) {
-		oldVal.f = data.at(i);
+		unsigned char* oldValP = (unsigned char*)(&data.at(i));
 		for (int j = 0; j != sizeof(T); ++j) {
-			newVal.b[j] = oldVal.b[sizeof(T) - j - 1];
+			newValP[j] = oldValP[sizeof(T) - j - 1];
 		}
-		data.at(i) = newVal.f;
+		data.at(i) = newVal;
 	}
 }
 
