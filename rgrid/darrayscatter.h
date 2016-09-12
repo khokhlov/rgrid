@@ -246,11 +246,21 @@ public:
 		return &dac.getDArrayPart(x, y, z)[0];
 	}
 	/**
-	 * \brief Start saving entire grid to file
+	 * \brief Start saving entire DArray to file
 	 * \param[in] filename name of output file
 	 * \param[in] fmt format of file
 	 * \todo support for TEXT format
-	 * \warning Don't modify grid data before call to rgrid::DArrayScatter< T, I >::saveDataEnd
+	 * 
+	 * Use this function to save data from computational DArrayScatter when: 
+	 * <br> 1. you don't have to reverse bytes
+	 * <br> 2. all DArray components have to be saved
+	 * 
+	 * In all other cases you should create new DArrayScatter with no local partitioning,
+	 * create data to be saved from computational DArrayScatter and place to new. 
+	 * During this process chose components to sace convert bytes.
+	 * Next, save data from new DArrayScatter by calling this function.
+	 * 
+	 * \warning Don't modify DArray data before call to rgrid::DArrayScatter< T, I >::saveDataEnd
 	 * \sa saveDataEnd
 	 */
 	void saveDataBegin(std::string filename, const rgio::format fmt	) {
@@ -270,9 +280,14 @@ public:
 		// write data
 		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
 		MPI_CHECK(MPI_File_set_view(fh, header.size() * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
-		// TODO next function very slow
-		dac.getDArray(tda);
-		MPI_CHECK(MPI_File_write_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
+		if (dac.numParts() == 1) {
+			DArray<T, I>& singleDA = dac.getDArrayPart(0);
+			MPI_CHECK(MPI_File_write_all_begin(fh, singleDA.getDataRaw(), 1, arrayDt.at(cartRank)));
+		} else {
+			// use slow implementation, make a copy of local dac in single DArray
+			dac.getDArray(tda);
+			MPI_CHECK(MPI_File_write_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
+		}
 	}
 	/** 
 	 * \brief Wait while all data will be saved
@@ -280,7 +295,11 @@ public:
 	 */
 	void saveDataEnd() {
 		if (cartComm == MPI_COMM_NULL) return;
-		MPI_CHECK(MPI_File_write_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
+		if (dac.numParts() == 1) {
+			MPI_CHECK(MPI_File_write_all_end(fh, dac.getDArrayPart(0).getDataRaw(), MPI_STATUS_IGNORE));
+		} else {
+			MPI_CHECK(MPI_File_write_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
+		}
 		MPI_CHECK(MPI_File_close(&fh));
 	}
 	/** 
@@ -435,7 +454,7 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
 		if (cartPos[d] == 0) {
 			neigh[SIDE_LEFT][d] = NO_NEIGHBOUR;
 		} else {
-			--cartPos[d];
+			--cartPos[d];			// use slow implementation, make a copy of local dac in single DArray
 			neigh[SIDE_LEFT][d] = rgmpi::cartRank(cartComm, cartPos);
 			++cartPos[d];
 		}
@@ -460,6 +479,21 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
 	             localPt[Z]
 	         );
 	generateSubarrayTypes();
+	// allocate memory for all DArray's
+	Dim3D<I> globalSize(size[X], size[Y], size[Z]);
+	Dim3D<I> localSize(RGCut<I>::partNodes(X, cartPos[X]), RGCut<I>::partNodes(Y, cartPos[Y]), RGCut<I>::partNodes(Z, cartPos[Z]));
+	Dim3D<I> localParts(localPt[X], localPt[Y], localPt[Z]);
+	Dim3D<I> dimGhost(ghost[X], ghost[Y], ghost[Z]);
+	Dim3D<I> origin(RGCut<I>::partOrigin(X, cartPos[X]), RGCut<I>::partOrigin(Y, cartPos[Y]), RGCut<I>::partOrigin(Z, cartPos[Z]));
+	
+	dac.setParts(
+		globalSize,
+		localSize,
+		localParts,
+		dimGhost,
+		origin,
+		nc
+	); 
 }
 
 template <typename T, typename I>

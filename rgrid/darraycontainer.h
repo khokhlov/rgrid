@@ -58,6 +58,21 @@ public:
 	 */
 	void setDArray(const DArray<T, I> &da, const I px, const I py, const I pz);
 	/**
+	 * \brief Allocate memory for DArrays
+	 * \param[in] size size of DArrayContainer
+	 * \param[in] parts number of DArray's
+	 * \param[in] ghost number of ghost nodes
+	 * \param[in] origin origin of current DArrayContainer
+	 * \param[in] components in each node
+	 */
+	void setParts(
+		const Dim3D<I>& globalSize,
+		const Dim3D<I>& localSize,
+		const Dim3D<I>& parts,
+		const Dim3D<I>& ghost,
+		const Dim3D<I>& origin,
+		const I components);
+	/**
 	 * \brief Get entire DArray from parts in DArrayContainer
 	 * \param[out] da entire DArray
 	 */
@@ -202,6 +217,31 @@ void DArrayContainer<T, I>::saveData(std::iostream &stream, const rgio::format f
 template <typename T, typename I>
 void DArrayContainer<T, I>::setDArray(const DArray<T, I> &da, const I numParts) {
 	setDArray(da, 1, 1, numParts);
+}
+
+template <typename T, typename I>
+void DArrayContainer<T, I>::setParts(
+	const Dim3D<I>& globalSize,
+	const Dim3D<I>& localSize,
+	const Dim3D<I>& parts,
+	const Dim3D<I>& ghost,
+	const Dim3D<I>& origin,
+	const I components)
+{
+	RGCut<I>::setCutParams(localSize.x, localSize.y, localSize.z, parts.x, parts.y, parts.z);
+	dArray.resize(parts.x * parts.y * parts.z);
+	for (I k = 0; k != parts.z; ++k)
+		for (I j = 0; j != parts.y; ++j)
+			for (I i = 0; i != parts.x; ++i) {
+				I ind = RGCut<I>::linInd(i, j, k);
+				Dim3D<I> o(RGCut<I>::partOrigin(X, i), RGCut<I>::partOrigin(Y, j), RGCut<I>::partOrigin(Z, k));
+				dArray.at(ind).resize(
+					globalSize.x, globalSize.y, globalSize.z,
+					RGCut<I>::partNodes(X, i), RGCut<I>::partNodes(Y, j), RGCut<I>::partNodes(Z, k),
+					origin.x + o.x, origin.y + o.y, origin.z + o.z,
+					ghost.x, ghost.y, ghost.z,
+					components);
+			}
 }
 
 template <typename T, typename I>

@@ -306,6 +306,12 @@ public:
 	 */
 	typename std::vector<char>::size_type
 	saveData(std::vector<char> &buffer, typename std::vector<char>::size_type start, const rgio::format fmt) const;
+	
+	/** 
+	 * \brief Inverse bytes
+	 * \details Convert data representation from little-endian to big-endian and back
+	 */
+	 void inverseBytes();
 
 #ifdef USE_OPENCL
 public:
@@ -531,6 +537,22 @@ bool operator==(const DArray<T, I> &lhs, const DArray<T, I> &rhs) {
 					}
 				}
 	return true;
+}
+
+template <typename T, typename I>
+void DArray<T, I>::inverseBytes() {
+	RG_ASSERT(sizeof(unsigned char) == 1, "Always true");
+	union {
+		T f;
+		unsigned char b[sizeof(T)];
+	} oldVal, newVal;
+	for (typename std::vector<T>::size_type i = 0; i != data.size(); ++i) {
+		oldVal.f = data.at(i);
+		for (int j = 0; j != sizeof(T); ++j) {
+			newVal.b[j] = oldVal.b[sizeof(T) - j - 1];
+		}
+		data.at(i) = newVal.f;
+	}
 }
 
 #ifdef USE_OPENCL
