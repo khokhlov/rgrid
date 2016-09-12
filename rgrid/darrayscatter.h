@@ -249,7 +249,7 @@ public:
 	 * \brief Start saving entire DArray to file
 	 * \param[in] filename name of output file
 	 * \param[in] fmt format of file
-	 * \param[in] header is used when fmt == CUSTOM_HEADER
+	 * \param[in] ss is used when fmt == CUSTOM_HEADER
 	 * \todo support for TEXT format
 	 * 
 	 * Use this function to save data from computational DArrayScatter when: 
