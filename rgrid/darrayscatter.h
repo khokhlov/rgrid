@@ -249,6 +249,7 @@ public:
 	 * \brief Start saving entire DArray to file
 	 * \param[in] filename name of output file
 	 * \param[in] fmt format of file
+	 * \param[in] header is used when fmt == CUSTOM_HEADER
 	 * \todo support for TEXT format
 	 * 
 	 * Use this function to save data from computational DArrayScatter when: 
@@ -263,12 +264,17 @@ public:
 	 * \warning Don't modify DArray data before call to rgrid::DArrayScatter< T, I >::saveDataEnd
 	 * \sa saveDataEnd
 	 */
-	void saveDataBegin(std::string filename, const rgio::format fmt	) {
+	void saveDataBegin(std::string filename, const rgio::format fmt, std::stringstream* ss = NULL) {
 		if (cartComm == MPI_COMM_NULL) return;
-		std::stringstream ss;
 		Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
-		rgio::writeHeader(ss, size, getNC(), fmt);
-		std::string header = ss.str();
+		if (fmt != rgio::CUSTOM_HEADER) {
+			ss = new std::stringstream();
+			rgio::writeHeader(*ss, size, getNC(), fmt);
+		}
+		std::string header = ss->str();
+		if (fmt != rgio::CUSTOM_HEADER) {
+			delete ss;
+		}
 		// write header
 		if (rgmpi::commRank(cartComm) == 0) {
 			MPI_CHECK(MPI_File_open(MPI_COMM_SELF, filename.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
@@ -304,7 +310,7 @@ public:
 	}
 	/** 
 	 * \brief Start loading data from file 
-	 * \todo support for TEXT format
+	 * \todo support for formats other than BINARY
 	 * \param[in] filename name of input file
 	 * \warning Don't modify grid data before call to rgrid::DArrayScatter< T, I >::loadDataEnd
 	 * \sa loadDataEnd

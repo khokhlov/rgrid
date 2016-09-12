@@ -116,6 +116,7 @@ namespace rgio {
  */
 enum format { BINARY, ///< own DARRAY binary format
               TEXT, ///< own DARRAY text format
+              CUSTOM_HEADER, ///< binary format with custom header
 };
 
 } // namespace rgio
