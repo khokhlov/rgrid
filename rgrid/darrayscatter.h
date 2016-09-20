@@ -36,7 +36,7 @@ public:
 	 * 
 	 * To make more parts call setParts() before loading grid into DArrayScatter
 	 */
-	DArrayScatter() : cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL) 
+	DArrayScatter() : cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL)
 	{
 		I const size[ALL_DIRS] = {1, 1, 1};
 		I const globalPt[ALL_DIRS] = {1, 1, 1};
@@ -258,7 +258,7 @@ public:
 	 * 
 	 * In all other cases you should create new DArrayScatter with no local partitioning,
 	 * create data to be saved from computational DArrayScatter and place to new. 
-	 * During this process chose components to sace convert bytes.
+	 * During this process you should reverse bytes if needed.
 	 * Next, save data from new DArrayScatter by calling this function.
 	 * 
 	 * \warning Don't modify DArray data before call to rgrid::DArrayScatter< T, I >::saveDataEnd
@@ -305,6 +305,21 @@ public:
 			MPI_CHECK(MPI_File_write_all_end(fh, dac.getDArrayPart(0).getDataRaw(), MPI_STATUS_IGNORE));
 		} else {
 			MPI_CHECK(MPI_File_write_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
+		}
+		MPI_CHECK(MPI_File_close(&fh));
+	}
+	void appendData(const std::string& filename) {
+		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
+		MPI_Offset fileSize;
+		MPI_CHECK(MPI_File_get_size(fh, &fileSize));
+		MPI_CHECK(MPI_File_set_view(fh, fileSize, rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
+		if (dac.numParts() == 1) {
+			DArray<T, I>& singleDA = dac.getDArrayPart(0);
+			MPI_CHECK(MPI_File_write_all(fh, singleDA.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
+		} else {
+			// use slow implementation, make a copy of local dac in single DArray
+			dac.getDArray(tda);
+			MPI_CHECK(MPI_File_write_all(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
 		}
 		MPI_CHECK(MPI_File_close(&fh));
 	}
@@ -446,7 +461,7 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
 	}
 	this->nc = nc;
 	RGCut<I>::setCutParams(size, globalPt);
-	MPI_CHECK(MPI_Barrier(MPI_COMM_WORLD)); // wait before destroy communicator
+	rgmpi::barrier(); // wait before destroy communicator
 	if (cartComm != MPI_COMM_NULL) {
 		rgmpi::commFree(cartComm);
 	}

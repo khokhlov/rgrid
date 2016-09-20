@@ -10,6 +10,7 @@
 #include "rgrid/types.h"
 #include <cstdio>
 #include "rgrid/rgmpi.h"
+#include <string>
 
 namespace rgrid {
 
@@ -113,6 +114,21 @@ long loadHeaderMPI(const std::string& filename, Dim3D<I>& size, I& components, f
 }
 
 #endif
+
+/**
+ * \brief Inverse bytes order
+ */
+template <typename T>
+inline void inverseBytes(T& oldVal) {
+	RG_ASSERT(sizeof(unsigned char) == 1, "Always true");
+	T newVal;
+	unsigned char* newValP = (unsigned char*)(&newVal);
+	unsigned char* oldValP = (unsigned char*)(&oldVal);
+	for (int j = 0; j != sizeof(T); ++j) {
+		newValP[j] = oldValP[sizeof(T) - j - 1];
+	}
+	oldVal = newVal;
+}
 
 /**
  * \brief Basic header saver (own DArray format)

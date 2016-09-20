@@ -4,6 +4,7 @@
 #include "le_core.h"
 
 #include "rgrid/darrayscatter.h"
+#include "rgrid/vtksaver.h"
 
 int main(int argc, char **argv) {
 	rgmpi::init(&argc, &argv);
@@ -68,6 +69,12 @@ int main(int argc, char **argv) {
 
 		task.das.setAndScatter(0, task.da);
 		
+		rgrid::Dim3D<int_t> dims(task.n.x, task.n.y, 1);
+		rgrid::Dim3D<float> spacing(task.h.x, task.h.y, 1);
+		rgrid::Dim3D<float> origin(0, 0, 0);
+		task.vs.setHeaderStructPoints("Created by le_save_task", dims, origin, spacing);
+		task.vs.appendData("v", task.dasSave, VS::POINT_DATA);
+
 		t = timer();
 		for (i = 0; i < steps; i++) {
 			#ifdef SAVE_EVERY_STEP

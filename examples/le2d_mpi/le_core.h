@@ -4,6 +4,7 @@
 #include <sys/time.h>
 
 #include "rgrid/darrayscatter.h"
+#include "rgrid/vtksaver.h"
 
 static inline double timer()
 {
@@ -29,6 +30,8 @@ typedef rgrid::DArray<real, int_t> DA;
 typedef rgrid::DArrayScatter<float, int_t> DAS_F;
 typedef rgrid::DArrayContainer<float, int_t> DAC_F;
 typedef rgrid::DArray<float, int_t> DA_F;
+
+typedef rgrid::VTKSaver<float, int_t> VS;
 
 /* 2d vector struct. */
 typedef struct {
@@ -106,6 +109,8 @@ typedef struct {
 	DA da; // initialization
 	DAS das;
 	DAS_F dasSave;
+
+	VS vs;
 } le_task;
 
 /*

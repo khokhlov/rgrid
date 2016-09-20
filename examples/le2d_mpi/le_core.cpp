@@ -88,24 +88,6 @@ void le_free_task(le_task& task)
 
 int le_save_task(le_task &t, const char *file)
 {	
-	std::stringstream ss;
-
-	ss.precision(6); // diff with C version of this code
-	ss << std::fixed;
-
-	ss << "# vtk DataFile Version 3.0" << std::endl;
-	ss << "Created by le_save_task" << std::endl;
-	ss << "BINARY" << std::endl;
-	ss << "DATASET STRUCTURED_POINTS" << std::endl;
-	ss << "DIMENSIONS " << t.n.x << " " << t.n.y << " 1" << std::endl;
-	ss << "SPACING " << t.h.x << " " << t.h.y << " 0.0" << std::endl;
-	ss << "ORIGIN 0.0 0.0 0.0" << std::endl;
-	ss << "POINT_DATA " << t.n.x * t.n.y << std::endl;
-	
-	/* velocity */
-	ss << "SCALARS v float 1" << std::endl;
-	ss << "LOOKUP_TABLE v_table" << std::endl;
-
 	DA_F& ds = t.dasSave.getDArrayPart(0, 0, 0);
 	DAC& dac = t.das.getLocalContainer();
 	for (int_t k = 0; k != dac.numParts(rgrid::Z); ++k)
@@ -120,8 +102,7 @@ int le_save_task(le_task &t, const char *file)
 		}
 	}
 	ds.inverseBytes();
-	t.dasSave.saveDataBegin(std::string(file), rgrid::rgio::CUSTOM_HEADER, &ss);
-	t.dasSave.saveDataEnd();
+	t.vs.save(std::string(file));
 
 	return 0;
 }
