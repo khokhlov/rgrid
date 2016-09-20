@@ -5,12 +5,12 @@
 #include <string>
 #include <sstream>
 
-#ifdef USE_MPI
-
 using namespace std;
 
 namespace rgmpi
 {
+
+#ifdef USE_MPI
 std::string getError(const int rc)
 {
 	char error_string[BUFSIZ];
@@ -25,10 +25,16 @@ std::string getError(const int rc)
 	ss << "\", error msg: \"" << error_string << "\"";
 	return ss.str();
 }
+#endif
 
 void init(int *argc, char ***argv)
 {
+#ifdef USE_MPI
 	MPI_CHECK(MPI_Init(argc, argv));
+#else
+	(void)argc;
+	(void)argv;
+#endif
 }
 
 void init()
@@ -38,29 +44,44 @@ void init()
 
 bool forceInit()
 {
+#ifdef USE_MPI
 	int flag;
 	MPI_CHECK(MPI_Initialized(&flag));
 	if (flag == 0) {
 		init();
 	}
 	return flag == 1;
+#else
+	return 0;
+#endif
 }
 
 int worldSize()
 {
+#ifdef USE_MPI
 	return commSize(MPI_COMM_WORLD);
+#else
+	return 1;
+#endif
 }
 
 void barrier()
 {
+#ifdef USE_MPI
 	MPI_CHECK(MPI_Barrier(MPI_COMM_WORLD));
+#endif
 }
 
 int worldRank()
 {
+#ifdef USE_MPI
 	return commRank(MPI_COMM_WORLD);
+#else
+	return 0;
+#endif
 }
 
+#ifdef USE_MPI
 int commSize(MPI_Comm comm)
 {
 	int size;
@@ -97,16 +118,20 @@ int groupRank(MPI_Group g)
 	MPI_CHECK(MPI_Group_rank(g, &rank));
 	return rank;
 }
+#endif
 
 void forceFinalize()
 {
+#ifdef USE_MPI
 	int flag;
 	MPI_CHECK(MPI_Finalized(&flag));
 	if (flag == 0) {
 		MPI_CHECK(MPI_Finalize());
 	}
+#endif
 }
 
+#ifdef USE_MPI
 void cartCreate(MPI_Comm& cartComm, int const parts[3]) 
 {
 	int periods[3] = { false, false, false };
@@ -138,6 +163,6 @@ template <> MPI_Datatype getMPItype<double>() { return MPI_DOUBLE; }
 void freeSubarrayType(MPI_Datatype& dt) {
 	MPI_CHECK(MPI_Type_free(&dt));
 }
+#endif
 
 } /* namespace rgmpi */
-#endif // USE_MPI

@@ -7,13 +7,13 @@
 #define DARRAY_SCATTER_H
 
 #include <cstddef>
+#include <fstream>
 
 #include "rgrid/darraycontainer.h"
 #include "rgrid/pdim.h"
 #include "rgrid/rgmpi.h"
 #include "rgrid/darray.h"
 
-#ifdef USE_MPI
 namespace rgrid {
 
 /**
@@ -36,7 +36,10 @@ public:
 	 * 
 	 * To make more parts call setParts() before loading grid into DArrayScatter
 	 */
-	DArrayScatter() : cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL)
+	DArrayScatter()
+#ifdef USE_MPI
+	: cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL)
+#endif
 	{
 		I const size[ALL_DIRS] = {1, 1, 1};
 		I const globalPt[ALL_DIRS] = {1, 1, 1};
@@ -56,12 +59,15 @@ public:
 	 * \param[in] ghost number of ghost nodes on each side of grid
 	 * \param[in] nc number of type T variables in each grid node
 	 */
-	DArrayScatter(I const size[ALL_DIRS],
-	              I const globalPt[ALL_DIRS],
-	              I const localPt[ALL_DIRS],
-	              I const ghost[ALL_DIRS],
-	              I const nc) 
-		: cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL)
+	DArrayScatter(
+		I const size[ALL_DIRS],
+		I const globalPt[ALL_DIRS],
+		I const localPt[ALL_DIRS],
+		I const ghost[ALL_DIRS],
+		I const nc)
+#ifdef USE_MPI
+	: cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL)
+#endif
 	{
 		setSizes(size, globalPt, localPt, ghost, nc);
 	};
@@ -73,10 +79,13 @@ public:
 	 * \param[in] localPt number of local parts (DArray's in local DArrayContainer), can be different on different MPI processes
 	 * \param[in] ghost number of ghost nodes on each side of grid
 	 */
-	DArrayScatter(I const globalPt[ALL_DIRS],
-	              I const localPt[ALL_DIRS],
-	              I const ghost[ALL_DIRS])
-		: cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL)
+	DArrayScatter(
+		I const globalPt[ALL_DIRS],
+		I const localPt[ALL_DIRS],
+		I const ghost[ALL_DIRS])
+#ifdef USE_MPI
+	: cartComm(MPI_COMM_NULL), viewType(MPI_DATATYPE_NULL)
+#endif
 	{
 		setParts(globalPt, localPt, ghost);
 	}
@@ -100,7 +109,7 @@ public:
 		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) {
 			size[d] = globalPt[d] * localPt[d];
 		}
-		setSizes(size, globalPt, localPt, ghost, nc);
+		setSizes(size, globalPt, localPt, ghost, 1);
 	}
 	
 	/**
@@ -117,7 +126,20 @@ public:
 	              I const globalPt[ALL_DIRS],
 	              I const localPt[ALL_DIRS],
 	              I const ghost[ALL_DIRS],
-	              I const nc);
+	              I const nc) {
+		setSizes(
+			Dim3D<I>(size),
+			Dim3D<I>(globalPt),
+			Dim3D<I>(localPt),
+			Dim3D<I>(ghost),
+			nc);
+	}
+	void setSizes(
+		const Dim3D<I> size,
+		const Dim3D<I> globalPt,
+		const Dim3D<I> localPt,
+		const Dim3D<I> ghost,
+		const I nc);
 	/**
 	 * \brief Get local part of grid
 	 * 
@@ -191,7 +213,11 @@ public:
 	 * \return rank of current process in internal cartesian communicator
 	 */
 	int getInternalRank() const {
+#ifdef USE_MPI
 		return cartRank;
+#else
+		return 0;
+#endif
 	}
 	/**
 	 * \brief Get position in internal communicator
@@ -199,23 +225,28 @@ public:
 	 * \return position of current process in cartesian communicator in direction d
 	 */
 	int getInternalPos(CartDir d) {
+#ifdef USE_MPI
 		return cartPos[d];
+#else
+		return 0;
+#endif
 	}
 	/**
 	 * \brief Get number of components
 	 * \return number of components in each node
 	 */
 	I getNC() const {
-		return nc;
+		return dac.getNC();
 	}
 	/**
 	 * \brief Get number of ghost nodes
 	 * \param[in] d direction
 	 * \return number of ghost nodes in direction d
 	 */
-	I getGhost(CartDir d) const {
-		return ghost[d];
+	I getNGhost(CartDir d) const {
+		return dac.getNGhost(d);
 	}
+#ifdef USE_MPI
 	/**
 	 * \brief Get type for file view in MPI IO operations
 	 * \return file view type
@@ -231,6 +262,7 @@ public:
 	MPI_Datatype getDArrayDt(I x, I y, I z) const {
 		return arrayDt.at(RGCut<I>::linInd(x, y, z));
 	}
+#endif
 	/**
 	 * \brief Get DArray from local DarrayContainer
 	 * \return DArray with indexes (x, y, z) in local DArrayContainer 
@@ -245,6 +277,7 @@ public:
 	T *getDArrayBuffer(I x, I y, I z) {
 		return &dac.getDArrayPart(x, y, z)[0];
 	}
+#ifdef USE_MPI
 	/**
 	 * \brief Start saving entire DArray to file
 	 * \param[in] filename name of output file
@@ -264,65 +297,15 @@ public:
 	 * \warning Don't modify DArray data before call to rgrid::DArrayScatter< T, I >::saveDataEnd
 	 * \sa saveDataEnd
 	 */
-	void saveDataBegin(std::string filename, const rgio::format fmt, std::stringstream* ss = NULL) {
-		if (cartComm == MPI_COMM_NULL) return;
-		Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
-		if (fmt != rgio::CUSTOM_HEADER) {
-			ss = new std::stringstream();
-			rgio::writeHeader(*ss, size, getNC(), fmt);
-		}
-		std::string header = ss->str();
-		if (fmt != rgio::CUSTOM_HEADER) {
-			delete ss;
-		}
-		// write header
-		if (rgmpi::commRank(cartComm) == 0) {
-			MPI_CHECK(MPI_File_open(MPI_COMM_SELF, filename.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
-			MPI_CHECK(MPI_File_set_size(fh, 0));
-			MPI_CHECK(MPI_File_set_view(fh, 0, MPI_CHAR, MPI_CHAR, "native", MPI_INFO_NULL));
-			MPI_CHECK(MPI_File_write(fh, header.c_str(), header.size(), MPI_CHAR, MPI_STATUS_IGNORE));
-			MPI_CHECK(MPI_File_close(&fh));
-		}
-		// write data
-		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
-		MPI_CHECK(MPI_File_set_view(fh, header.size() * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
-		if (dac.numParts() == 1) {
-			DArray<T, I>& singleDA = dac.getDArrayPart(0);
-			MPI_CHECK(MPI_File_write_all_begin(fh, singleDA.getDataRaw(), 1, arrayDt.at(cartRank)));
-		} else {
-			// use slow implementation, make a copy of local dac in single DArray
-			dac.getDArray(tda);
-			MPI_CHECK(MPI_File_write_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
-		}
-	}
+	void saveDataBegin(std::string filename, const rgio::format fmt, std::stringstream* ss = NULL);
 	/** 
 	 * \brief Wait while all data will be saved
 	 * \sa saveDataBegin
 	 */
-	void saveDataEnd() {
-		if (cartComm == MPI_COMM_NULL) return;
-		if (dac.numParts() == 1) {
-			MPI_CHECK(MPI_File_write_all_end(fh, dac.getDArrayPart(0).getDataRaw(), MPI_STATUS_IGNORE));
-		} else {
-			MPI_CHECK(MPI_File_write_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
-		}
-		MPI_CHECK(MPI_File_close(&fh));
-	}
-	void appendData(const std::string& filename) {
-		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
-		MPI_Offset fileSize;
-		MPI_CHECK(MPI_File_get_size(fh, &fileSize));
-		MPI_CHECK(MPI_File_set_view(fh, fileSize, rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
-		if (dac.numParts() == 1) {
-			DArray<T, I>& singleDA = dac.getDArrayPart(0);
-			MPI_CHECK(MPI_File_write_all(fh, singleDA.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
-		} else {
-			// use slow implementation, make a copy of local dac in single DArray
-			dac.getDArray(tda);
-			MPI_CHECK(MPI_File_write_all(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
-		}
-		MPI_CHECK(MPI_File_close(&fh));
-	}
+	void saveDataEnd();
+#endif
+	void appendData(const std::string& filename);
+#ifdef USE_MPI
 	/** 
 	 * \brief Start loading data from file 
 	 * \todo support for formats other than BINARY
@@ -330,72 +313,23 @@ public:
 	 * \warning Don't modify grid data before call to rgrid::DArrayScatter< T, I >::loadDataEnd
 	 * \sa loadDataEnd
 	 */
-	void loadDataBegin(std::string filename) {
-		if (cartComm == MPI_COMM_NULL) return;
-		std::fstream fs;
-		struct newParams {
-			I size[ALL_DIRS];
-			I components;
-			long offset;
-			int format;
-		} np;
-		// read header by first process
-		if (rgmpi::commRank(cartComm) == 0) {
-			rgio::format fmt;
-			Dim3D<I> size;
-			np.offset = rgio::loadHeaderMPI(filename, size, np.components, fmt);
-			np.size[X] = size[X];
-			np.size[Y] = size[Y];
-			np.size[Z] = size[Z];
-			np.format = fmt;
-		}
-		// send header info to other processes
-		const int nitems = 4;
-		const int blocklengths[nitems] = {ALL_DIRS, 1, 1, 1};
-		const MPI_Datatype types[nitems] = {rgmpi::getMPItype<I>(), rgmpi::getMPItype<I>(), MPI_LONG, MPI_INT};
-		MPI_Datatype mpi_np_type;
-		MPI_Aint offsets[nitems] = { offsetof(newParams, size),
-		                             offsetof(newParams, components),
-		                             offsetof(newParams, offset),
-		                             offsetof(newParams, format) };
-		
-		MPI_CHECK(MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_np_type));
-		MPI_CHECK(MPI_Type_commit(&mpi_np_type));
-		MPI_CHECK(MPI_Bcast(&np, 1, mpi_np_type, 0, cartComm));
-		MPI_CHECK(MPI_Type_free(&mpi_np_type));
-		// resize
-		const I glPt[ALL_DIRS] = { RGCut<I>::numParts(X), RGCut<I>::numParts(Y), RGCut<I>::numParts(Z) };
-		setSizes(np.size, glPt, localPt, ghost, np.components);
-		// read data
-		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh));
-		MPI_CHECK(MPI_File_set_view(fh, np.offset * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
-		tda.resize(
-			RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
-			RGCut<I>::partNodes(X, cartPos[X]), RGCut<I>::partNodes(Y, cartPos[Y]), RGCut<I>::partNodes(Z, cartPos[Z]),
-			RGCut<I>::partOrigin(X, cartPos[X]), RGCut<I>::partOrigin(Y, cartPos[Y]), RGCut<I>::partOrigin(Z, cartPos[Z]),
-			ghost[X], ghost[Y], ghost[Z],
-			nc
-		);
-		MPI_CHECK(MPI_File_read_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
-		
-	}
+	void loadDataBegin(std::string filename);
 	/**
 	 * \brief Wait while all data will be loaded
 	 * \sa loadDataBegin
 	 */
-	void loadDataEnd() {
-		if (cartComm == MPI_COMM_NULL) return;
-		MPI_CHECK(MPI_File_read_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
-		dac.setDArray(tda, localPt[X], localPt[Y], localPt[Z]);
-		MPI_CHECK(MPI_File_close(&fh));
-		tda.resize(0,0,0, 0,0,0, 0,0,0, 0,0,0, 0); // free memory
-	}
+	void loadDataEnd();
+#endif
 private:
+	
+	DArrayScatter(DArrayScatter const &);
+	DArrayScatter &operator=(DArrayScatter const &);
+	
+#ifdef USE_MPI
+	
 	MPI_File fh;
 	// datatypes for local array
 	std::vector<MPI_Datatype> locArrayDt;
-
-private:
 
 	enum mpiTag {
 		SCATTER = 0,
@@ -403,70 +337,206 @@ private:
 		SYNC
 	};
 
-	DArrayScatter(DArrayScatter const &);
-	DArrayScatter &operator=(DArrayScatter const &);
-
 	/* generate types for scatter, gather */
 	void generateSubarrayTypes();
 	/* release MPI subarray types */
 	void releaseSubarrayTypes(std::vector<MPI_Datatype> &dt);
-	/* send boundary nodes to negihbours */
-	void sendNodesStart(int rank, CartSide side, CartDir dir);
-	void sendNodesEnd();
 
-	/* container for local darrays */
-	DArrayContainer<T, I> dac;
-	/* position of local DArrayContainer */
-	I cartPos[ALL_DIRS];
 	/* cart comm for current decomposition */
 	MPI_Comm cartComm;
-	/* rank of current process in cart comm */
-	int cartRank;
-	/* neighbours ranks in cart comm */
-	int neigh[SIDE_ALL][ALL_DIRS];
+	
 	/* external sync buffers */
 	std::vector<T> sendBuf[SIDE_ALL][ALL_DIRS];
 	std::vector<T> recvBuf[SIDE_ALL][ALL_DIRS];
 	/* request for external sync start and end */
 	MPI_Request syncSendReq[SIDE_ALL * ALL_DIRS];
 	MPI_Request syncRecvReq[SIDE_ALL * ALL_DIRS];
-	/* value in neighbours array, if there is no neighbour */
-	static const I NO_NEIGHBOUR = -1;
-	/* parts in DArrayContainer */
-	I localPt[ALL_DIRS];
-	/* size of ghost */
-	I ghost[ALL_DIRS];
-	/* number of componentes */
-	I nc;
+	
 	/* types for every subarray in big array */
 	std::vector<MPI_Datatype> subArrayDt;
 	/* types for every subarray itself */
 	std::vector<MPI_Datatype> arrayDt;
 	/* view type */
 	MPI_Datatype viewType;
-	/* RGCut for local DArrayContainer */
-	RGCut<I> dacCut;
 	/* temp DArray for save/load */
 	DArray<T, I> tda;
+	
+	/* position of local DArrayContainer */
+	I cartPos[ALL_DIRS];
+	/* rank of current process in cart comm */
+	int cartRank;
+	
+	/* neighbours ranks in cart comm */
+	int neigh[SIDE_ALL][ALL_DIRS];
+	/* value in neighbours array, if there is no neighbour */
+	static const I NO_NEIGHBOUR = -1;
+	
+#endif
+	
+	/* container for local darrays */
+	DArrayContainer<T, I> dac;
 };
 
+#ifdef USE_MPI
 template <typename T, typename I>
-void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
-                                   I const globalPt[ALL_DIRS],
-                                   I const localPt[ALL_DIRS],
-                                   I const ghost[ALL_DIRS],
-                                   I const nc) {
+void DArrayScatter<T, I>::saveDataBegin(std::string filename, const rgio::format fmt, std::stringstream* ss) {
+	if (cartComm == MPI_COMM_NULL) return;
+	Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
+	if (fmt != rgio::CUSTOM_HEADER) {
+		ss = new std::stringstream();
+		rgio::writeHeader(*ss, size, getNC(), fmt);
+	}
+	std::string header = ss->str();
+	if (fmt != rgio::CUSTOM_HEADER) {
+		delete ss;
+	}
+	// write header
+	if (rgmpi::commRank(cartComm) == 0) {
+		MPI_CHECK(MPI_File_open(MPI_COMM_SELF, filename.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
+		MPI_CHECK(MPI_File_set_size(fh, 0));
+		MPI_CHECK(MPI_File_set_view(fh, 0, MPI_CHAR, MPI_CHAR, "native", MPI_INFO_NULL));
+		MPI_CHECK(MPI_File_write(fh, header.c_str(), header.size(), MPI_CHAR, MPI_STATUS_IGNORE));
+		MPI_CHECK(MPI_File_close(&fh));
+	}
+	// write data
+	MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
+	MPI_CHECK(MPI_File_set_view(fh, header.size() * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
+	if (dac.numParts() == 1) {
+		DArray<T, I>& singleDA = dac.getDArrayPart(0);
+		MPI_CHECK(MPI_File_write_all_begin(fh, singleDA.getDataRaw(), 1, arrayDt.at(cartRank)));
+	} else {
+		// use slow implementation, make a copy of local dac in single DArray
+		dac.getDArray(tda);
+		MPI_CHECK(MPI_File_write_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
+	}
+}
+
+template <typename T, typename I>
+void DArrayScatter<T, I>::saveDataEnd() {
+	if (cartComm == MPI_COMM_NULL) return;
+	if (dac.numParts() == 1) {
+		MPI_CHECK(MPI_File_write_all_end(fh, dac.getDArrayPart(0).getDataRaw(), MPI_STATUS_IGNORE));
+	} else {
+		MPI_CHECK(MPI_File_write_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
+	}
+	MPI_CHECK(MPI_File_close(&fh));
+}
+#endif
+
+template <typename T, typename I>
+void DArrayScatter<T, I>::appendData(const std::string& filename) {
+#ifdef USE_MPI
+	MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_WRONLY, MPI_INFO_NULL, &fh));
+	MPI_Offset fileSize;
+	MPI_CHECK(MPI_File_get_size(fh, &fileSize));
+	MPI_CHECK(MPI_File_set_view(fh, fileSize, rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
+	if (dac.numParts() == 1) {
+		DArray<T, I>& singleDA = dac.getDArrayPart(0);
+		MPI_CHECK(MPI_File_write_all(fh, singleDA.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
+	} else {
+		// use slow implementation, make a copy of local dac in single DArray
+		dac.getDArray(tda);
+		MPI_CHECK(MPI_File_write_all(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
+	}
+	MPI_CHECK(MPI_File_close(&fh));
+#else
+	std::fstream fs;
+	fs.open(filename.c_str(), std::ios_base::out | std::ios_base::app);
+	dac.appendData(fs, rgio::BINARY);
+	fs.close();
+#endif
+}
+
+#ifdef USE_MPI
+template <typename T, typename I>
+void DArrayScatter<T, I>::loadDataBegin(std::string filename) {
+	if (cartComm == MPI_COMM_NULL) return;
+	std::fstream fs;
+	struct newParams {
+		I size[ALL_DIRS];
+		I components;
+		long offset;
+		int format;
+	} np;
+	// read header by first process
+	if (rgmpi::commRank(cartComm) == 0) {
+		rgio::format fmt;
+		Dim3D<I> size;
+		np.offset = rgio::loadHeaderMPI(filename, size, np.components, fmt);
+		np.size[X] = size[X];
+		np.size[Y] = size[Y];
+		np.size[Z] = size[Z];
+		np.format = fmt;
+	}
+	// send header info to other processes
+	const int nitems = 4;
+	const int blocklengths[nitems] = {ALL_DIRS, 1, 1, 1};
+	const MPI_Datatype types[nitems] = {rgmpi::getMPItype<I>(), rgmpi::getMPItype<I>(), MPI_LONG, MPI_INT};
+	MPI_Datatype mpi_np_type;
+	MPI_Aint offsets[nitems] = { offsetof(newParams, size),
+		offsetof(newParams, components),
+		offsetof(newParams, offset),
+		offsetof(newParams, format) };
+		
+		MPI_CHECK(MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_np_type));
+		MPI_CHECK(MPI_Type_commit(&mpi_np_type));
+		MPI_CHECK(MPI_Bcast(&np, 1, mpi_np_type, 0, cartComm));
+		MPI_CHECK(MPI_Type_free(&mpi_np_type));
+		// resize
+		const I globalPt[ALL_DIRS] = { RGCut<I>::numParts(X), RGCut<I>::numParts(Y), RGCut<I>::numParts(Z) };
+		const I localParts[ALL_DIRS] = { dac.numParts(X), dac.numParts(Y), dac.numParts(Z) };
+		const I ghost[ALL_DIRS] = { dac.getNGhost(X), dac.getNGhost(Y), dac.getNGhost(Z) };
+		setSizes(np.size, globalPt, localParts, ghost, np.components);
+		// read data
+		MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh));
+		MPI_CHECK(MPI_File_set_view(fh, np.offset * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
+		tda.resize(
+			RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
+			RGCut<I>::partNodes(X, cartPos[X]), RGCut<I>::partNodes(Y, cartPos[Y]), RGCut<I>::partNodes(Z, cartPos[Z]),
+			RGCut<I>::partOrigin(X, cartPos[X]), RGCut<I>::partOrigin(Y, cartPos[Y]), RGCut<I>::partOrigin(Z, cartPos[Z]),
+			getNGhost(X), getNGhost(Y), getNGhost(Z),
+			dac.getNC()
+		);
+		MPI_CHECK(MPI_File_read_all_begin(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank)));
+}
+
+template <typename T, typename I>
+void DArrayScatter<T, I>::loadDataEnd() {
+	if (cartComm == MPI_COMM_NULL) return;
+	MPI_CHECK(MPI_File_read_all_end(fh, tda.getDataRaw(), MPI_STATUS_IGNORE));
+	dac.setDArray(
+		tda,
+		dac.numParts(X),
+		dac.numParts(Y),
+		dac.numParts(Z));
+	MPI_CHECK(MPI_File_close(&fh));
+	tda.resize(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // free memory
+}
+#endif
+
+template <typename T, typename I>
+void DArrayScatter<T, I>::setSizes(
+	const Dim3D<I> size,
+	const Dim3D<I> globalPt,
+	const Dim3D<I> localPt,
+	const Dim3D<I> ghost,
+	const I nc) 
+{
+#ifndef USE_MPI
+	RG_ASSERT(globalPt.x == 1 && globalPt.y == 1 && globalPt.z == 1, "Trying to use global partitioning without MPI support");
+#endif
 	for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) {
 		RG_ASSERT(size[d] >= globalPt[d] * localPt[d], "Wrong grid partitioning");
 	}
-	this->nc = nc;
 	RGCut<I>::setCutParams(size, globalPt);
+#ifdef USE_MPI
 	rgmpi::barrier(); // wait before destroy communicator
 	if (cartComm != MPI_COMM_NULL) {
 		rgmpi::commFree(cartComm);
 	}
-	rgmpi::cartCreate(cartComm, globalPt);
-	if (cartComm == MPI_COMM_NULL) return; // make stubs if we choose to take more processes later		
+	int gp[ALL_DIRS] = {globalPt.x, globalPt.y, globalPt.z};
+	rgmpi::cartCreate(cartComm, gp);
+	if (cartComm == MPI_COMM_NULL) return; // make stubs if we choose to take more processes later
 	cartRank = rgmpi::commRank(cartComm);
 	rgmpi::cartCoords(cartComm, cartRank, cartPos);
 
@@ -487,41 +557,31 @@ void DArrayScatter<T, I>::setSizes(I const size[ALL_DIRS],
 			--cartPos[d];
 		}
 	}
-	for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) {
-		this->localPt[d] = localPt[d];
-		this->ghost[d] = ghost[d];
-	}
-	dacCut = RGCut<I>(
-	             RGCut<I>::partNodes(X, cartPos[X]),
-	             RGCut<I>::partNodes(Y, cartPos[Y]),
-	             RGCut<I>::partNodes(Z, cartPos[Z]),
-	             localPt[X],
-	             localPt[Y],
-	             localPt[Z]
-	         );
-	generateSubarrayTypes();
-	// allocate memory for all DArray's
-	Dim3D<I> globalSize(size[X], size[Y], size[Z]);
-	Dim3D<I> localSize(RGCut<I>::partNodes(X, cartPos[X]), RGCut<I>::partNodes(Y, cartPos[Y]), RGCut<I>::partNodes(Z, cartPos[Z]));
-	Dim3D<I> localParts(localPt[X], localPt[Y], localPt[Z]);
-	Dim3D<I> dimGhost(ghost[X], ghost[Y], ghost[Z]);
-	Dim3D<I> origin(RGCut<I>::partOrigin(X, cartPos[X]), RGCut<I>::partOrigin(Y, cartPos[Y]), RGCut<I>::partOrigin(Z, cartPos[Z]));
+#else
+	Dim3D<I> cartPos(0, 0, 0);
+#endif
 	
+	// allocate memory for all DArray's	
 	dac.setParts(
-		globalSize,
-		localSize,
-		localParts,
-		dimGhost,
-		origin,
+		size,
+		RGCut<I>::partNodes(cartPos),
+		localPt,
+		ghost,
+		RGCut<I>::partOrigin(cartPos),
 		nc
-	); 
+	);
+
+#ifdef USE_MPI
+	generateSubarrayTypes();
+#endif
 }
 
 template <typename T, typename I>
 void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> const &da) {
+#ifdef USE_MPI
 	/// \todo for every da create new subarray types
 	if (cartRank == processRank) {
-		RG_ASSERT(da.ghost(X) == ghost[X] && da.ghost(Z) == ghost[Z] && da.ghost(Z) == ghost[Z], "ghost nodes have to be equal");
+		RG_ASSERT(da.ghost(X) == dac.getNGhost(X) && da.ghost(Y) == dac.getNGhost(Y) && da.ghost(Z) == dac.getNGhost(Z), "Ghost nodes have to be equal");
 	}
 	if (cartComm == MPI_COMM_NULL) return;
 	std::vector<MPI_Request> req;
@@ -548,13 +608,12 @@ void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> cons
 	MPI_CHECK(MPI_Bcast(&ns, 1, mpi_ns_type, processRank, cartComm));
 	MPI_CHECK(MPI_Type_free(&mpi_ns_type));
 	// resize local DArrayContainers and create types
-	I globalPt[ALL_DIRS] = { RGCut<I>::numParts(X),
-	                         RGCut<I>::numParts(Y),
-	                         RGCut<I>::numParts(Z) };
-	I localPt[ALL_DIRS] = { dacCut.numParts(X),
-	                        dacCut.numParts(Y),
-	                        dacCut.numParts(Z) };
-	setSizes(ns.size, globalPt, localPt, ghost, ns.nc);
+	setSizes(
+		Dim3D<I>(ns.size),
+		RGCut<I>::numParts3(),
+		dac.numParts3(),
+		dac.getNGhost(),
+		ns.nc);
 	if (processRank == cartRank) {
 		RG_ASSERT(RGCut<I>::numNodes() == da.localSize(), "Wrong number of nodes");
 		req.resize(RGCut<I>::numParts());
@@ -579,16 +638,20 @@ void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> cons
 	    RGCut<I>::partOrigin(X, cartPos[X]),
 	    RGCut<I>::partOrigin(Y, cartPos[Y]),
 	    RGCut<I>::partOrigin(Z, cartPos[Z]),
-	    ghost[X], ghost[Y], ghost[Z],
-	    nc);
+	    dac.getNGhost(X), dac.getNGhost(Y), dac.getNGhost(Z),
+	    dac.getNC());
 	MPI_CHECK(MPI_Recv(&tda[0], 1, arrayDt[cartRank], processRank, SCATTER, cartComm, MPI_STATUS_IGNORE));
-	dac.setDArray(tda, localPt[X], localPt[Y], localPt[Z]);
+	dac.setDArray(tda, dac.numParts(X), dac.numParts(Y), dac.numParts(Z));
 	if (processRank == cartRank) {
 		// wait while all parts will be received
 		MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
 	}
+#else
+	dac.setDArray(da, dac.numParts(X), dac.numParts(Y), dac.numParts(Z));
+#endif
 }
 
+#ifdef USE_MPI
 template <typename T, typename I>
 void DArrayScatter<T, I>::generateSubarrayTypes() {
 	if (cartComm == MPI_COMM_NULL) return;
@@ -605,21 +668,21 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 				{
 					// generate subArrayDt
 					int array_of_sizes[4] = {
-						RGCut<I>::numNodes(X) + 2 * ghost[X],
-						RGCut<I>::numNodes(Y) + 2 * ghost[Y],
-						RGCut<I>::numNodes(Z) + 2 * ghost[Z],
-						nc
+						RGCut<I>::numNodes(X) + 2 * getNGhost(X),
+						RGCut<I>::numNodes(Y) + 2 * getNGhost(Y),
+						RGCut<I>::numNodes(Z) + 2 * getNGhost(Z),
+						getNC()
 					};
 					int array_of_subsizes[4] = {
 						RGCut<I>::partNodes(X, i),
 						RGCut<I>::partNodes(Y, j),
 						RGCut<I>::partNodes(Z, k),
-						nc
+						getNC()
 					};
 					int array_of_starts[4] = {
-						ghost[X] + RGCut<I>::partOrigin(X, i),
-						ghost[Y] + RGCut<I>::partOrigin(Y, j),
-						ghost[Z] + RGCut<I>::partOrigin(Z, k),
+						getNGhost(X) + RGCut<I>::partOrigin(X, i),
+						getNGhost(Y) + RGCut<I>::partOrigin(Y, j),
+						getNGhost(Z) + RGCut<I>::partOrigin(Z, k),
 						0
 					};
 					subArrayDt[rank] = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
@@ -627,18 +690,18 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 				{
 					// generate arrayDt
 					int array_of_sizes[4] = {
-						RGCut<I>::partNodes(X, i) + 2 * ghost[X],
-						RGCut<I>::partNodes(Y, j) + 2 * ghost[Y],
-						RGCut<I>::partNodes(Z, k) + 2 * ghost[Z],
-						nc
+						RGCut<I>::partNodes(X, i) + 2 * getNGhost(X),
+						RGCut<I>::partNodes(Y, j) + 2 * getNGhost(Y),
+						RGCut<I>::partNodes(Z, k) + 2 * getNGhost(Z),
+						getNC()
 					};
 					int array_of_subsizes[4] = {
 						RGCut<I>::partNodes(X, i),
 						RGCut<I>::partNodes(Y, j),
 						RGCut<I>::partNodes(Z, k),
-						nc
+						getNC()
 					};
-					int array_of_starts[4] = { ghost[X], ghost[Y], ghost[Z], 0 };
+					int array_of_starts[4] = { getNGhost(X), getNGhost(Y), getNGhost(Z), 0 };
 					arrayDt[rank] = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
 				}
 			}
@@ -647,13 +710,13 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 		RGCut<I>::numNodes(X),
 		RGCut<I>::numNodes(Y),
 		RGCut<I>::numNodes(Z),
-		nc
+		getNC()
 	};
 	int array_of_subsizes[4] = {
 		RGCut<I>::partNodes(X, cartPos[X]),
 		RGCut<I>::partNodes(Y, cartPos[Y]),
 		RGCut<I>::partNodes(Z, cartPos[Z]),
-		nc
+		getNC()
 	};
 	int array_of_starts[4] = {
 		RGCut<I>::partOrigin(X, cartPos[X]),
@@ -662,30 +725,30 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 		0
 	};
 	viewType = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
-	locArrayDt.resize(dacCut.numParts());
-	for (I k = 0; k != dacCut.numParts(Z); ++k)
-		for (I j = 0; j != dacCut.numParts(Y); ++j)
-			for (I i = 0; i != dacCut.numParts(X); ++i) {
+	locArrayDt.resize(dac.numParts());
+	for (I k = 0; k != dac.numParts(Z); ++k)
+		for (I j = 0; j != dac.numParts(Y); ++j)
+			for (I i = 0; i != dac.numParts(X); ++i) {
 				// type for local DArrays
 				int array_of_sizes[4] = {
-					dacCut.partNodes(X, i) + 2 * ghost[X],
-					dacCut.partNodes(Y, j) + 2 * ghost[Y],
-					dacCut.partNodes(Z, k) + 2 * ghost[Z],
-					nc
+					dac.partNodes(X, i) + 2 * getNGhost(X),
+					dac.partNodes(Y, j) + 2 * getNGhost(Y),
+					dac.partNodes(Z, k) + 2 * getNGhost(Z),
+					getNC()
 				};
 				int array_of_subsizes[4] = {
-					dacCut.partNodes(X, i),
-					dacCut.partNodes(Y, j),
-					dacCut.partNodes(Z, k),
-					nc
+					dac.partNodes(X, i),
+					dac.partNodes(Y, j),
+					dac.partNodes(Z, k),
+					getNC()
 				};
 				int array_of_starts[4] = {
-					ghost[X],
-					ghost[Y],
-					ghost[Z],
+					getNGhost(X),
+					getNGhost(Y),
+					getNGhost(Z),
 					0
 				};
-				locArrayDt.at(dacCut.linInd(i, j, k)) = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
+				locArrayDt.at(dac.linInd(i, j, k)) = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
 			}
 }
 
@@ -696,9 +759,11 @@ void DArrayScatter<T, I>::releaseSubarrayTypes(std::vector<MPI_Datatype> &dt) {
 	}
 	dt.resize(0);
 }
+#endif
 
 template<typename T, typename I>
 DArrayScatter<T, I>::~DArrayScatter() {
+#ifdef USE_MPI
 	releaseSubarrayTypes(subArrayDt);
 	releaseSubarrayTypes(arrayDt);
 	releaseSubarrayTypes(locArrayDt);
@@ -706,19 +771,21 @@ DArrayScatter<T, I>::~DArrayScatter() {
 		rgmpi::freeSubarrayType(viewType);
 	}
 	rgmpi::commFree(cartComm);
+#endif
 }
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::gatherAndGet(int processRank, DArray<T, I> &da) {
+#ifdef USE_MPI
 	if (cartComm == MPI_COMM_NULL) return;
 	std::vector<MPI_Request> req;
 	if (processRank == cartRank) {
 		da.resize(
-		    RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
-		    RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
-		    0, 0, 0,
-		    ghost[X], ghost[Y], ghost[Z],
-		    nc);
+			RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
+			RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
+			0, 0, 0,
+			getNGhost(X), getNGhost(Y), getNGhost(Z),
+			getNC());
 		req.resize(RGCut<I>::numParts());
 		// recv parts from all processes
 		for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
@@ -738,16 +805,23 @@ void DArrayScatter<T, I>::gatherAndGet(int processRank, DArray<T, I> &da) {
 		// wait while all parts will be received
 		MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
 	}
+#else
+	RG_ASSERT(0 == processRank, "There is single process");
+	dac.getDArray(da);
+#endif
 }
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::internalSync() {
+#ifdef USE_MPI
 	if (cartComm == MPI_COMM_NULL) return;
+#endif
 	dac.sync();
 }
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::fillGhost() {
+#ifdef USE_MPI
 	if (cartComm == MPI_COMM_NULL) return;
 	for (CartSide s = SIDE_LEFT; s != SIDE_ALL; s = static_cast<CartSide>(s + 1))
 		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1))
@@ -766,10 +840,14 @@ void DArrayScatter<T, I>::fillGhost() {
 						da.fillGhost(d, s);
 					}
 			}
+#else
+	dac.fillGhost();
+#endif
 }
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::externalSyncStart() {
+#ifdef USE_MPI
 	if (cartComm == MPI_COMM_NULL) return;
 	for (CartSide s = SIDE_LEFT; s != SIDE_ALL; s = static_cast<CartSide>(s + 1))
 		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1))
@@ -788,24 +866,24 @@ void DArrayScatter<T, I>::externalSyncStart() {
 						cda.localGhostSize(X),
 						cda.localGhostSize(Y),
 						cda.localGhostSize(Z),
-						nc
+						getNC()
 					};
-					int subsizes[4] = { 0, 0, 0, nc };
-					subsizes[d] = ghost[d];
+					int subsizes[4] = { 0, 0, 0, getNC() };
+					subsizes[d] = getNGhost(d);
 					subsizes[ort1] = cda.localSize(ort1);
 					subsizes[ort2] = cda.localSize(ort2);
-					int starts[4] = { ghost[X], ghost[Y], ghost[Z], 0 };
+					int starts[4] = { getNGhost(X), getNGhost(Y), getNGhost(Z), 0 };
 					// types for ghost nodes in current DArray (recv to this nodes)
-					starts[d] = (s == SIDE_LEFT) ? 0 : cda.localGhostSize(d) - ghost[d];
+					starts[d] = (s == SIDE_LEFT) ? 0 : cda.localGhostSize(d) - getNGhost(d);
 					MPI_Datatype ghostDT = rgmpi::createSubarrayType<T>(sizes, subsizes, starts);
 					// types for boundary (not ghost) nodes in current DArray (send from this nodes)
-					starts[d] = (s == SIDE_LEFT) ? ghost[d] : cda.localGhostSize(d) - 2 * ghost[d];
+					starts[d] = (s == SIDE_LEFT) ? getNGhost(d) : cda.localGhostSize(d) - 2 * getNGhost(d);
 					MPI_Datatype boundDT = rgmpi::createSubarrayType<T>(sizes, subsizes, starts);
 					
 					MPI_CHECK(MPI_Irecv(cda.getDataRaw(), 1, ghostDT, neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
 					MPI_CHECK(MPI_Isend(cda.getDataRaw(), 1, boundDT, neigh[s][d], SYNC, cartComm, &syncSendReq[s + d * SIDE_ALL]));
 				} else {
-					I bufSize = dac.numNodes(ort1) * dac.numNodes(ort2) * ghost[d] * nc;
+					I bufSize = dac.numNodes(ort1) * dac.numNodes(ort2) * getNGhost(d) * getNC();
 					// start recv
 					recvBuf[s][d].resize(bufSize);
 					MPI_CHECK(MPI_Irecv(&recvBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
@@ -821,8 +899,8 @@ void DArrayScatter<T, I>::externalSyncStart() {
 						dac.numNodes(Y),
 						dac.numNodes(Z),
 					};
-					size[d] = ghost[d];
-					orig[d] = (s == SIDE_LEFT) ? 0 : dac.numNodes(d) - ghost[d];
+					size[d] = getNGhost(d);
+					orig[d] = (s == SIDE_LEFT) ? 0 : dac.numNodes(d) - getNGhost(d);
 					dac.getSubArray(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], sendBuf[s][d]);
 					MPI_CHECK(MPI_Isend(&sendBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncSendReq[s + d * SIDE_ALL]));
 				}
@@ -830,10 +908,12 @@ void DArrayScatter<T, I>::externalSyncStart() {
 				syncRecvReq[s + d * SIDE_ALL] = MPI_REQUEST_NULL;
 				syncSendReq[s + d * SIDE_ALL] = MPI_REQUEST_NULL;
 			}
+#endif
 }
 
 template<typename T, typename I>
 void DArrayScatter<T, I>::externalSyncEnd() {
+#ifdef USE_MPI
 	if (cartComm == MPI_COMM_NULL) return;
 	while (1) {
 		int index;
@@ -856,16 +936,15 @@ void DArrayScatter<T, I>::externalSyncEnd() {
 				dac.numNodes(Y),
 				dac.numNodes(Z),
 			};
-			size[d] = ghost[d];
-			orig[d] = (s == SIDE_LEFT) ? -ghost[d] : dac.numNodes(d);
+			size[d] = getNGhost(d);
+			orig[d] = (s == SIDE_LEFT) ? -getNGhost(d) : dac.numNodes(d);
 			dac.setSubArrayWithGhost(orig[X], orig[Y], orig[Z], size[X], size[Y], size[Z], recvBuf[s][d]);
 		}
 	}
 	MPI_CHECK(MPI_Waitall(SIDE_ALL * ALL_DIRS, syncSendReq, MPI_STATUSES_IGNORE));
+#endif
 }
 
 } /* namespace rgrid */
-
-#endif // USE_MPI
 
 #endif /* DARRAY_SCATTER_H */

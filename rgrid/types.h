@@ -22,6 +22,11 @@ enum CartDir {
 	DIR_UNDEFINED
 };
 
+inline const CartDir& operator++(CartDir& d) {
+	d = static_cast<CartDir>(d + 1);
+	return d;
+}
+
 /**
  * CartSide represents side of something: left or right
  */
@@ -60,6 +65,10 @@ struct Dim3D {
 	}
 	Dim3D() {
 		
+	}
+	Dim3D(const T a[ALL_DIRS]) 
+		: x(a[X]), y(a[Y]), z(a[Z])
+	{
 	}
 	/**
 	 * \brief Get coord by index X, Y or Z

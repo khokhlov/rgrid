@@ -42,6 +42,13 @@ public:
 	 * \param[in] pt is number of parts to devide
 	 */
 	void setCutParams(I const sz[ALL_DIRS], I const pt[ALL_DIRS]) {
+		setCutParams(Dim3D<I>(sz), Dim3D<I>(pt));
+	}
+	/**
+	 * \param[in] sz is entire size in nodes in each direction
+	 * \param[in] pt is number of parts to devide
+	 */
+	void setCutParams(const Dim3D<I> sz, const Dim3D<I> pt) {
 		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d+1)) {
 			parts[d] = pt[d];
 			size[d] = sz[d];
@@ -68,6 +75,10 @@ public:
 	 * \brief number of parts in each direction
 	 */
 	I numParts(CartDir dir) const { return parts[dir]; }
+	/**
+	 * \brief number of parts in each direction
+	 */
+	Dim3D<I> numParts3() const { return parts; }
 	/** 
 	 * \brief Get index of part in linear array
 	 */
@@ -100,6 +111,10 @@ public:
 	 */
 	I numNodes(CartDir dir) const { return size[dir]; }
 	/** 
+	 * \brief Number of nodes in all parts in each direction
+	 */
+	Dim3D<I> numNodes3() const { return size; }
+	/** 
 	 * \brief Locate index of node in its part
 	 * \param[in] dir direction to search
 	 * \param[in] contIdx index of node
@@ -129,11 +144,32 @@ public:
 	I partOrigin(const CartDir dir, const I partNum) const {
 		return partNum <= iml[dir] ? (ml[dir] + 1) * partNum : size[dir] - ml[dir] * (parts[dir] - partNum);
 	}
+	/**
+	 * \brief Get origin of part
+	 */
+	Dim3D<I> partOrigin(const Dim3D<I>& partNum) const {
+		Dim3D<I> r;
+		for (CartDir d = X; d < ALL_DIRS; ++d) {
+			r[d] = partNum[d] <= iml[d] ? (ml[d] + 1) * partNum[d] : size[d] - ml[d] * (parts[d] - partNum[d]);
+		}
+		return r;
+	}
 	/** 
 	 * \brief Get part nodes number
 	 */
 	I partNodes(const CartDir dir, const I partNum) const {
 		return partNum < iml[dir] ? ml[dir] + 1 : ml[dir];
+	}
+	/** 
+	 * \brief Get part nodes number
+	 * \param partPos coordinate of part
+	 */
+	Dim3D<I> partNodes(const Dim3D<I>& partPos) const {
+		Dim3D<I> r;
+		for (CartDir d = X; d < ALL_DIRS; ++d) {
+			r[d] = partPos[d] < iml[d] ? ml[d] + 1 : ml[d];
+		}
+		return r;
 	}
 	/**
 	 * \brief Make the same RGcut as specified
@@ -162,15 +198,15 @@ public:
 	}
 private:
 	/* number of parts in each direction */
-	I parts[ALL_DIRS];
+	Dim3D<I> parts;
 	/* total number of parts */
 	I allParts;
 	/* number of nodes in each direction in ALL parts */
-	I size[ALL_DIRS];
+	Dim3D<I> size;
 	/* minimal length - length in nodes of last parts in each direction */
-	I ml[ALL_DIRS];
+	Dim3D<I> ml;
 	/* index of part before that number of nodes equals ml[dir] + 1 */
-	I iml[ALL_DIRS];
+	Dim3D<I> iml;
 };
 
 } /* namespace rgrid */

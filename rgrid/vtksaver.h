@@ -17,7 +17,6 @@ namespace rgrid {
 
 template <typename T> std::string getVTKType();
 
-#ifdef USE_MPI
 template <typename T, typename I>
 class VTKSaver {
 public:
@@ -161,7 +160,6 @@ private:
 	VTKSaver(VTKSaver const &);
 	VTKSaver &operator=(VTKSaver const &);
 };
-#endif
 
 } // namespace rgrid
 

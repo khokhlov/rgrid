@@ -22,14 +22,17 @@
 	{ int rc = x; \
 	if (rc != MPI_SUCCESS) RG_ASSERT(rc == MPI_SUCCESS, STR(#x) + ": " + rgmpi::getError(rc)); }
 
+#endif // USE_MPI
 
 namespace rgmpi
 {
 	
+#ifdef USE_MPI
 /** 
  * \brief Get MPI error by code
  */
 std::string getError(const int rc);
+#endif
 /**
  * \brief Init MPI
  * \param[out] argc get number of command line args
@@ -53,6 +56,7 @@ int worldRank();
  * \brief Get size of MPI_COMM_WORLD
  */
 int worldSize();
+#ifdef USE_MPI
 /**
  * \brief Get size of communicator
  */
@@ -73,6 +77,7 @@ int groupSize(MPI_Group g);
  * \brief Get group rank
  */
 int groupRank(MPI_Group s);
+#endif
 /**
  * \brief Finilize MPI
  */
@@ -86,7 +91,21 @@ void barrier();
  * \param[out] cartComm
  * \param[in] parts number of parts in each direction
  */
+#ifdef USE_MPI
 void cartCreate(MPI_Comm& cartComm, int const parts[3]);
+/**
+ * \brief Create cart comm from MPI_COMM_WORLD communicator
+ * \param[out] cartComm
+ * \param[in] parts number of parts in each direction
+ */
+template <typename I>
+inline void cartCreate(MPI_Comm& cartComm, rgrid::Dim3D<I> parts) {
+	const int p[3];
+	p[0] = parts.x;
+	p[1] = parts.y;
+	p[2] = parts.z;
+	cartCreate(cartComm, p);
+}
 /**
  * \brief Get coords of process with specific rank in cart comm
  * \param[in] cartComm
@@ -135,7 +154,9 @@ MPI_Datatype createSubarrayType(int gsize[4], int lsize[4], int start[4]) {
  */
 void freeSubarrayType(MPI_Datatype& dt);
 
-};
 #endif // USE_MPI
+
+} // namespace rgmpi
+
 
 #endif // RGRID_MPI_H

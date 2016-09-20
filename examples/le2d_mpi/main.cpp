@@ -30,12 +30,6 @@ int main(int argc, char **argv) {
 		
 		int_t globalPt[3] = {atoi(argv[4]), atoi(argv[5]), 1};
 		int_t localPt[3] = {atoi(argv[6]), atoi(argv[7]), 1};
-		if (task.das.getInternalRank() == 1) {
-			localPt[rgrid::X] = 3;
-		}
-		if (task.das.getInternalRank() == 4) {
-			localPt[rgrid::Y] = 3;
-		}
 		int_t ghost[3] = {2, 2, 0};
 		task.das.setParts(globalPt, localPt, ghost);
 		

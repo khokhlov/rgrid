@@ -165,13 +165,44 @@ public:
 	 */
 	void writeLine(std::iostream &stream, const I cn, const I y, const I z, const rgio::format fmt) const;
 	/**
-	 * \brief save all DArrayContainer data into stream
+	 * \brief save all DArrayContainer data and header into stream
 	 * 
 	 * \param[in] stream output stream
 	 * \param[in] fmt writing format
 	 */
 	void saveData(std::iostream &stream, const rgio::format fmt) const;
-
+	/**
+	 * \brief Append all DArrayContainer data at the end of stream
+	 * 
+	 * \param[in] stream output stream
+	 * \param[in] fmt writing format
+	 */
+	void appendData(std::iostream &stream, const rgio::format fmt) const;
+	/**
+	 * \brief Get number of ghost nodes
+	 */
+	Dim3D<I> getNGhost() const {
+		if (dArray.empty()) return 0;
+		Dim3D<I> ghost;
+		for (CartDir d = X; d != ALL_DIRS; ++d) {
+			ghost[d] = dArray.at(0).ghost(d);
+		}
+		return ghost;
+	}
+	/**
+	 * \brief Get number of ghost nodes
+	 */
+	I getNGhost(CartDir d) const {
+		if (dArray.empty()) return 0;
+		return dArray.at(0).ghost(d);
+	}
+	/**
+	 * \brief Get number of components
+	 */
+	I getNC() const { 
+		if (dArray.empty()) return 0;
+		return dArray.at(0).getNC();
+	}
 #ifdef USE_OPENCL
 	/**
 	 * \brief The same as fillGhost(), but without copy to host
@@ -205,9 +236,16 @@ void DArrayContainer<T, I>::saveData(std::iostream &stream, const rgio::format f
 	Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
 	I nc = dArray.at(0).getNC();
 	rgio::writeHeader(stream, size, nc, fmt);
+	appendData(stream, fmt);
+}
+
+template <typename T, typename I>
+void DArrayContainer<T, I>::appendData(std::iostream &stream, const rgio::format fmt) const {
+	Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
+	I nc = getNC();
 	for (I cn = 0; cn != nc; ++cn) {
-		for (I z = 0; z != RGCut<I>::numNodes(Z); ++z) {
-			for (I y = 0; y != RGCut<I>::numNodes(Y); ++y) {
+		for (I z = 0; z != size.z; ++z) {
+			for (I y = 0; y != size.y; ++y) {
 				writeLine(stream, cn, y, z, fmt);
 			}
 		}
@@ -399,7 +437,7 @@ void DArrayContainer<T, I>::fillGhost() {
 				if (i == 0) {
 					da.fillGhost(X, SIDE_LEFT);
 				}
-				if (j == RGCut<I>::numParts(X) - 1) {
+				if (i == RGCut<I>::numParts(X) - 1) {
 					da.fillGhost(X, SIDE_RIGHT);
 				}
 				if (j == 0) {
