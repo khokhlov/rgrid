@@ -15,9 +15,9 @@ namespace rgrid {
 
 /**
  * \brief DArrayContainer splits DArray to work with small parts
- * 
+ *
  * One big DArray divided into smaller DArrays, so you can use OpenMP or OpenCL with them
- * 
+ *
  * \tparam T type of every grid node (i.e. double, float)
  * \tparam I type of grid indexes (i.e. int, long)
  */
@@ -40,7 +40,7 @@ public:
 	/**
 	 * \brief Create DArrayContainer from existing DArray
 	 * \param[in] da DArray to split
-	 * \param[in] px,py,pz num parts in (X,Y,Z) directions 
+	 * \param[in] px,py,pz num parts in (X,Y,Z) directions
 	 */
 	DArrayContainer(const DArray<T, I> &da, const I px, const I py, const I pz) : RGCut<I>() {
 		setDArray(da, px, py, pz);
@@ -77,11 +77,11 @@ public:
 	 * \param[out] da entire DArray
 	 */
 	void getDArray(DArray<T, I> &da) const;
-	/** 
+	/**
 	 * \brief Get specific part of DArray.
-	 * 
+	 *
 	 * Use this function if DArray splitted only in one dimension
-	 * 
+	 *
 	 * \param[in] partNum number of part
 	 * \return DArray part
 	 */
@@ -96,11 +96,11 @@ public:
 		RG_ASSERT(dArray.size() > static_cast<size_t>(partNum), "Out of range");
 		return dArray.at(partNum);
 	}
-	/** 
+	/**
 	 * \brief Get specific part of DArray.
-	 * 
+	 *
 	 * Use this function if DArray splitted in 3 dimensions
-	 * 
+	 *
 	 * \param[in] i,j,k numbers of parts in dimensions (X,Y,Z)
 	 * \return DArray part
 	 */
@@ -129,13 +129,13 @@ public:
 
 	/**
 	 * \brief Copy rect region from entire DArrayContainer
-	 * 
+	 *
 	 * \param[in] ox,oy,oz origins of rect region
 	 * \param[in] sx,sy,sz starts of rect region
 	 * \param[out] buffer rect region
 	 */
 	void getSubArray(I ox, I oy, I oz, I sx, I sy, I sz, std::vector<T> &buffer);
-	/** 
+	/**
 	 * \brief Copy rect region from entire DArrayContainer
 	 * \param[in] ox,oy,oz origins of rect region
 	 * \param[in] sx,sy,sz starts of rect region
@@ -157,7 +157,7 @@ public:
 	void sync();
 	/**
 	 * \brief write all nodes in X direction into stream
-	 * 
+	 *
 	 * \param[in] stream output stream
 	 * \param[in] cn number of component
 	 * \param[in] y,z coordiantes of line
@@ -165,19 +165,33 @@ public:
 	 */
 	void writeLine(std::iostream &stream, const I cn, const I y, const I z, const rgio::format fmt) const;
 	/**
+	 * \brief Read all nodes in X direction from stream.
+	 * \param[in] stream input stream
+	 * \param[in] cn number of component
+	 * \param[in] y,z coordiantes of line
+	 * \param[in] fmt reading format
+	 */
+	void readLine(std::iostream &stream, const I cn, const I y, const I z, const rgio::format fmt);
+	/**
 	 * \brief save all DArrayContainer data and header into stream
-	 * 
+	 *
 	 * \param[in] stream output stream
 	 * \param[in] fmt writing format
 	 */
 	void saveData(std::iostream &stream, const rgio::format fmt) const;
 	/**
 	 * \brief Append all DArrayContainer data at the end of stream
-	 * 
+	 *
 	 * \param[in] stream output stream
 	 * \param[in] fmt writing format
 	 */
 	void appendData(std::iostream &stream, const rgio::format fmt) const;
+	/**
+	 * \brief Load DArrayContainer data from stream.
+	 * \param[in] stream input stream
+	 * \param[in] fmt reading format
+	 */
+	void loadData(std::iostream& stream, const rgio::format fmt);
 	/**
 	 * \brief Get number of ghost nodes
 	 */
@@ -199,20 +213,20 @@ public:
 	/**
 	 * \brief Get number of components
 	 */
-	I getNC() const { 
+	I getNC() const {
 		if (dArray.empty()) return 0;
 		return dArray.at(0).getNC();
 	}
 #ifdef USE_OPENCL
 	/**
 	 * \brief The same as fillGhost(), but without copy to host
-	 * 
+	 *
 	 * When every DArray part on device it will work faster
 	 */
 	void fillGhostCL();
 	/**
 	 * \brief The same as sync(), but without copy to host
-	 * 
+	 *
 	 * When every DArray part on device it will work faster
 	 */
 	void syncCL();
@@ -232,6 +246,15 @@ void DArrayContainer<T, I>::writeLine(std::iostream &stream, const I cn, const I
 }
 
 template <typename T, typename I>
+void DArrayContainer<T, I>::readLine(std::iostream &stream, const I cn, const I y, const I z, const rgio::format fmt) {
+	Dim3D<I> pn(0, RGCut<I>::locatePart(Y, y), RGCut<I>::locatePart(Z, z));
+	Dim3D<I> idx(0, RGCut<I>::locateIndex(Y, y), RGCut<I>::locateIndex(Z, z));
+	for (pn[X] = 0; pn[X] != RGCut<I>::numParts(X); ++pn[X]) {
+		dArray.at(RGCut<I>::linInd(pn[X], pn[Y], pn[Z])).readLine(stream, cn, idx[Y], idx[Z], fmt);
+	}
+}
+
+template <typename T, typename I>
 void DArrayContainer<T, I>::saveData(std::iostream &stream, const rgio::format fmt) const {
 	Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
 	I nc = dArray.at(0).getNC();
@@ -247,6 +270,20 @@ void DArrayContainer<T, I>::appendData(std::iostream &stream, const rgio::format
 		for (I z = 0; z != size.z; ++z) {
 			for (I y = 0; y != size.y; ++y) {
 				writeLine(stream, cn, y, z, fmt);
+			}
+		}
+	}
+}
+
+
+template <typename T, typename I>
+void DArrayContainer<T, I>::loadData(std::iostream &stream, const rgio::format fmt) {
+	Dim3D<I> size(RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z));
+	I nc = getNC();
+	for (I cn = 0; cn != nc; ++cn) {
+		for (I z = 0; z != size.z; ++z) {
+			for (I y = 0; y != size.y; ++y) {
+				readLine(stream, cn, y, z, fmt);
 			}
 		}
 	}

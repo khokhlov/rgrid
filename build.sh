@@ -16,8 +16,9 @@ cd build_mpi
 cmake ../ -DUSE_MPI=1
 # make clean
 make -j 4
- 
+
 ../test.sh
+../mpi_test.sh
 
 cd ..
 echo "Building with OpenCL support"
@@ -38,3 +39,4 @@ cmake ../ -DUSE_OPENCL=1 -DUSE_MPI=1
 make -j 4
 
 ../test.sh
+../mpi_test.sh

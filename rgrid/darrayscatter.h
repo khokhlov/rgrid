@@ -18,13 +18,13 @@ namespace rgrid {
 
 /**
  * \brief DArrayScatter represents grid with two partitioning steps
- * 
+ *
  * First step is global partitioning - MPI.
  * DArrayScatter contains one DArrayContainer on each process.
- * 
+ *
  * Second step is local partitioning - OpenMP, OpenCL, etc.
  * Each local DArrayContainer contains DArrays.
- * 
+ *
  * \tparam T type of every grid node (i.e. double, float)
  * \tparam I type of grid indexes (i.e. int, long)
  */
@@ -33,7 +33,7 @@ class DArrayScatter : public RGCut<I> {
 public:
 	/**
 	 * \brief Default constructor, one global and one local part
-	 * 
+	 *
 	 * To make more parts call setParts() before loading grid into DArrayScatter
 	 */
 	DArrayScatter()
@@ -48,10 +48,10 @@ public:
 		I const nc = 1;
 		setSizes(size, globalPt, localPt, ghost, nc);
 	};
-	
+
 	/**
 	 * \brief The most verbose constructor: grid size and partitioning
-	 * 
+	 *
 	 * \note It's better to use DArrayScatter(I const globalPt[ALL_DIRS], I const localPt[ALL_DIRS], I const ghost[ALL_DIRS]) instead
 	 * \param[in] size number of nodes of entire grid
 	 * \param[in] globalPt number of global parts (MPI processes in each direction)
@@ -71,10 +71,10 @@ public:
 	{
 		setSizes(size, globalPt, localPt, ghost, nc);
 	};
-	
+
 	/**
 	 * \brief Constructor with grid partitioning
-	 * 
+	 *
 	 * \param[in] globalPt number of global parts (MPI processes in each direction)
 	 * \param[in] localPt number of local parts (DArray's in local DArrayContainer), can be different on different MPI processes
 	 * \param[in] ghost number of ghost nodes on each side of grid
@@ -89,15 +89,15 @@ public:
 	{
 		setParts(globalPt, localPt, ghost);
 	}
-	
+
 	~DArrayScatter();
-	
+
 	/**
 	 * \brief Set grid partitioning
-	 * 
+	 *
 	 * Call to this function causes creation of MPI communicator with cartesian topology
 	 * with dimensions specified in globalPt. All processes in MPI_COMM_WORLD call this function.
-	 * 
+	 *
 	 * \param[in] globalPt number of global parts (MPI processes in each direction)
 	 * \param[in] localPt number of local parts (DArray's in local DArrayContainer), can be different on different MPI processes
 	 * \param[in] ghost number of ghost nodes on each side of grid
@@ -111,10 +111,10 @@ public:
 		}
 		setSizes(size, globalPt, localPt, ghost, 1);
 	}
-	
+
 	/**
 	 * \brief Set grid size and partitioning
-	 * 
+	 *
 	 * \note It's better to use setParts(I const globalPt[ALL_DIRS], I const localPt[ALL_DIRS], I const ghost[ALL_DIRS]) instead
 	 * \param[in] size number of nodes of entire grid
 	 * \param[in] globalPt number of global parts (MPI processes in each direction)
@@ -142,9 +142,9 @@ public:
 		const I nc);
 	/**
 	 * \brief Get local part of grid
-	 * 
+	 *
 	 * Get local container when grid loaded
-	 * 
+	 *
 	 * \return DArrayContainer which represents local part of entire grid
 	 */
 	DArrayContainer<T, I> &getLocalContainer() {
@@ -152,59 +152,59 @@ public:
 	}
 	/**
 	 * \brief Scatter DArray from one process to all
-	 * 
+	 *
 	 * Process which rank == processRank divides own DArray da into parts and
-	 * sends them to other processes. 
-	 * All processes call this function, but processes with rank != processRank 
+	 * sends them to other processes.
+	 * All processes call this function, but processes with rank != processRank
 	 * set dummy DArray in da which is not used.
-	 * 
-	 * \note Load grid by loadDataBegin when there are 
+	 *
+	 * \note Load grid by loadDataBegin when there are
 	 * not enough memory to save entire grid on one process
-	 * 
+	 *
 	 * \param[in] processRank rank of process to scatter from
 	 * \param[in] da DArray to scatter
 	 */
 	void setAndScatter(int const processRank, DArray<T, I> const &da);
 	/**
 	 * \brief Gather DArray from all processes to one
-	 * 
-	 * Gather DArray to process with rank == processRank 
-	 * All processes call this function. Process with rank == processRank 
+	 *
+	 * Gather DArray to process with rank == processRank
+	 * All processes call this function. Process with rank == processRank
 	 * receive full DArray in da, da on other processes remains unchanged.
-	 * 
+	 *
 	 * \param[in] processRank rank of process to gather to
 	 * \param[out] da DArray to gather
 	 */
 	void gatherAndGet(int const processRank, DArray<T, I> &da);
 	/**
 	 * \brief Synchronization inside local DArrayContainer
-	 * 
+	 *
 	 * Fill ghost nodes of local DArrays in local DArrayContainer by
 	 * copying them from other DArrays inside local DArrayContainer
 	 */
 	void internalSync();
 	/**
 	 * \brief Synchronization between DArrayContainers on different processes
-	 * 
+	 *
 	 * Start to receive ghost nodes for local DArrays in local
 	 * DArrayContainer from other processes
-	 * 
+	 *
 	 * \warning Don't use ghost nodes before call to rgrid::DArrayScatter< T, I >::externalSyncEnd()
-	 * 
+	 *
 	 * \sa externalSyncEnd
 	 */
 	void externalSyncStart();
 	/**
 	 * \brief Synchronization between DArrayContainers on different processes
-	 * 
+	 *
 	 * Wait until all data will be received and written in ghost nodes of local DArrays
-	 * 
+	 *
 	 * \sa externalSyncStart
 	 */
 	void externalSyncEnd();
 	/**
 	 * \brief Fill local ghost nodes with values from boundary nodes
-	 * 
+	 *
 	 * Local ghost nodes on the edge of entire grid will be filled.
 	 */
 	void fillGhost();
@@ -265,7 +265,7 @@ public:
 #endif
 	/**
 	 * \brief Get DArray from local DarrayContainer
-	 * \return DArray with indexes (x, y, z) in local DArrayContainer 
+	 * \return DArray with indexes (x, y, z) in local DArrayContainer
 	 */
 	DArray<T, I> &getDArrayPart(I x, I y, I z) {
 		return dac.getDArrayPart(x, y, z);
@@ -284,30 +284,39 @@ public:
 	 * \param[in] fmt format of file
 	 * \param[in] ss is used when fmt == CUSTOM_HEADER
 	 * \todo support for TEXT format
-	 * 
-	 * Use this function to save data from computational DArrayScatter when: 
+	 *
+	 * Use this function to save data from computational DArrayScatter when:
 	 * <br> 1. you don't have to reverse bytes
 	 * <br> 2. all DArray components have to be saved
-	 * 
+	 *
 	 * In all other cases you should create new DArrayScatter with no local partitioning,
-	 * create data to be saved from computational DArrayScatter and place to new. 
+	 * create data to be saved from computational DArrayScatter and place to new.
 	 * During this process you should reverse bytes if needed.
 	 * Next, save data from new DArrayScatter by calling this function.
-	 * 
+	 *
 	 * \warning Don't modify DArray data before call to rgrid::DArrayScatter< T, I >::saveDataEnd
 	 * \sa saveDataEnd
 	 */
 	void saveDataBegin(std::string filename, const rgio::format fmt, std::stringstream* ss = NULL);
-	/** 
+	/**
 	 * \brief Wait while all data will be saved
 	 * \sa saveDataBegin
 	 */
 	void saveDataEnd();
 #endif
+	/**
+	 * \brief Append grid data in binary format to file.
+	 * If MPI enabled it uses efficient implementation.
+	 */
 	void appendData(const std::string& filename);
+	/**
+	 * \brief Load data in binary format from file.
+	 * If MPI enabled it uses efficient implementation.
+	 */
+	void loadData(const std::string& filename, long offset = 0);
 #ifdef USE_MPI
-	/** 
-	 * \brief Start loading data from file 
+	/**
+	 * \brief Start loading data from file
 	 * \todo support for formats other than BINARY
 	 * \param[in] filename name of input file
 	 * \warning Don't modify grid data before call to rgrid::DArrayScatter< T, I >::loadDataEnd
@@ -321,12 +330,12 @@ public:
 	void loadDataEnd();
 #endif
 private:
-	
+
 	DArrayScatter(DArrayScatter const &);
 	DArrayScatter &operator=(DArrayScatter const &);
-	
+
 #ifdef USE_MPI
-	
+
 	MPI_File fh;
 	// datatypes for local array
 	std::vector<MPI_Datatype> locArrayDt;
@@ -344,14 +353,14 @@ private:
 
 	/* cart comm for current decomposition */
 	MPI_Comm cartComm;
-	
+
 	/* external sync buffers */
 	std::vector<T> sendBuf[SIDE_ALL][ALL_DIRS];
 	std::vector<T> recvBuf[SIDE_ALL][ALL_DIRS];
 	/* request for external sync start and end */
 	MPI_Request syncSendReq[SIDE_ALL * ALL_DIRS];
 	MPI_Request syncRecvReq[SIDE_ALL * ALL_DIRS];
-	
+
 	/* types for every subarray in big array */
 	std::vector<MPI_Datatype> subArrayDt;
 	/* types for every subarray itself */
@@ -360,19 +369,19 @@ private:
 	MPI_Datatype viewType;
 	/* temp DArray for save/load */
 	DArray<T, I> tda;
-	
+
 	/* position of local DArrayContainer */
 	I cartPos[ALL_DIRS];
 	/* rank of current process in cart comm */
 	int cartRank;
-	
+
 	/* neighbours ranks in cart comm */
 	int neigh[SIDE_ALL][ALL_DIRS];
 	/* value in neighbours array, if there is no neighbour */
 	static const I NO_NEIGHBOUR = -1;
-	
+
 #endif
-	
+
 	/* container for local darrays */
 	DArrayContainer<T, I> dac;
 };
@@ -442,7 +451,39 @@ void DArrayScatter<T, I>::appendData(const std::string& filename) {
 #else
 	std::fstream fs;
 	fs.open(filename.c_str(), std::ios_base::out | std::ios_base::app);
+	RG_ASSERT(fs.is_open(), "Can't open file");
 	dac.appendData(fs, rgio::BINARY);
+	fs.close();
+#endif
+}
+
+template <typename T, typename I>
+void DArrayScatter<T, I>::loadData(const std::string& filename, long offset) {
+#ifdef USE_MPI
+	MPI_CHECK(MPI_File_open(cartComm, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh));
+	MPI_CHECK(MPI_File_set_view(fh, offset * sizeof(char), rgmpi::getMPItype<T>(), fileViewType(), "native", MPI_INFO_NULL));
+	if (dac.numParts() == 1) {
+		DArray<T, I>& singleDA = dac.getDArrayPart(0);
+		MPI_CHECK(MPI_File_read_all(fh, singleDA.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
+	} else {
+		tda.resize(
+			RGCut<I>::numNodes(X), RGCut<I>::numNodes(Y), RGCut<I>::numNodes(Z),
+			RGCut<I>::partNodes(X, cartPos[X]), RGCut<I>::partNodes(Y, cartPos[Y]), RGCut<I>::partNodes(Z, cartPos[Z]),
+			RGCut<I>::partOrigin(X, cartPos[X]), RGCut<I>::partOrigin(Y, cartPos[Y]), RGCut<I>::partOrigin(Z, cartPos[Z]),
+			getNGhost(X), getNGhost(Y), getNGhost(Z),
+			dac.getNC()
+		);
+		MPI_CHECK(MPI_File_read_all(fh, tda.getDataRaw(), 1, arrayDt.at(cartRank), MPI_STATUS_IGNORE));
+		dac.setDArray(tda, dac.numParts(X), dac.numParts(Y), dac.numParts(Z));
+		tda.resize(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); // free memory
+	}
+	MPI_CHECK(MPI_File_close(&fh));
+#else
+	std::fstream fs;
+	fs.open(filename.c_str(), std::ios_base::in);
+	RG_ASSERT(fs.is_open(), "Can't open file");
+	fs.seekg(offset);
+	dac.loadData(fs, rgio::BINARY);
 	fs.close();
 #endif
 }
@@ -477,7 +518,7 @@ void DArrayScatter<T, I>::loadDataBegin(std::string filename) {
 		offsetof(newParams, components),
 		offsetof(newParams, offset),
 		offsetof(newParams, format) };
-		
+
 		MPI_CHECK(MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_np_type));
 		MPI_CHECK(MPI_Type_commit(&mpi_np_type));
 		MPI_CHECK(MPI_Bcast(&np, 1, mpi_np_type, 0, cartComm));
@@ -520,7 +561,7 @@ void DArrayScatter<T, I>::setSizes(
 	const Dim3D<I> globalPt,
 	const Dim3D<I> localPt,
 	const Dim3D<I> ghost,
-	const I nc) 
+	const I nc)
 {
 #ifndef USE_MPI
 	RG_ASSERT(globalPt.x == 1 && globalPt.y == 1 && globalPt.z == 1, "Trying to use global partitioning without MPI support");
@@ -560,8 +601,8 @@ void DArrayScatter<T, I>::setSizes(
 #else
 	Dim3D<I> cartPos(0, 0, 0);
 #endif
-	
-	// allocate memory for all DArray's	
+
+	// allocate memory for all DArray's
 	dac.setParts(
 		size,
 		RGCut<I>::partNodes(cartPos),
@@ -856,7 +897,7 @@ void DArrayScatter<T, I>::externalSyncStart() {
 				ortDirs(d, ort1, ort2);
 				if (dac.numParts(ort1) == 1 && dac.numParts(ort2) == 1) {
 					// optimized synchronization without temporary buffer when there are no local partitioning
-					
+
 					// current DArray
 					Dim3D<I> locIdx(0, 0, 0);
 					locIdx[d] = (s == SIDE_LEFT) ? 0 : dac.numParts(d) - 1;
@@ -879,7 +920,7 @@ void DArrayScatter<T, I>::externalSyncStart() {
 					// types for boundary (not ghost) nodes in current DArray (send from this nodes)
 					starts[d] = (s == SIDE_LEFT) ? getNGhost(d) : cda.localGhostSize(d) - 2 * getNGhost(d);
 					MPI_Datatype boundDT = rgmpi::createSubarrayType<T>(sizes, subsizes, starts);
-					
+
 					MPI_CHECK(MPI_Irecv(cda.getDataRaw(), 1, ghostDT, neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
 					MPI_CHECK(MPI_Isend(cda.getDataRaw(), 1, boundDT, neigh[s][d], SYNC, cartComm, &syncSendReq[s + d * SIDE_ALL]));
 				} else {
@@ -888,10 +929,10 @@ void DArrayScatter<T, I>::externalSyncStart() {
 					recvBuf[s][d].resize(bufSize);
 					MPI_CHECK(MPI_Irecv(&recvBuf[s][d].front(), bufSize, rgmpi::getMPItype<T>(), neigh[s][d], SYNC, cartComm, &syncRecvReq[s + d * SIDE_ALL]));
 					// start send
-					
+
 					// now we have many DA inside DAC and we want to get ghost plane from DAC,
 					// so we have to combine ghost planes from every DA placed on the border of local DAC
-					
+
 					// sub array size and position
 					I orig[ALL_DIRS] = { 0, 0, 0 };
 					I size[ALL_DIRS] = {
@@ -925,7 +966,7 @@ void DArrayScatter<T, I>::externalSyncEnd() {
 		CartDir d = static_cast<CartDir>(index / SIDE_ALL);
 		CartDir ort1, ort2;
 		ortDirs(d, ort1, ort2);
-		
+
 		if (dac.numParts(ort1) == 1 && dac.numParts(ort2) == 1) {
 			// nothing to do, optimized synchronization
 		} else {
