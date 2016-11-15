@@ -134,12 +134,35 @@ public:
 			Dim3D<I>(ghost),
 			nc);
 	}
+	/**
+	 * \brief Set grid size and partitioning
+	 *
+	 * \param[in] size number of nodes of entire grid
+	 * \param[in] globalPt number of global parts (MPI processes in each direction)
+	 * \param[in] localPt number of local parts (DArray's in local DArrayContainer), can be different on different MPI processes
+	 * \param[in] ghost number of ghost nodes on each side of grid
+	 * \param[in] nc number of type T variables in each grid node
+	 */
 	void setSizes(
 		const Dim3D<I> size,
 		const Dim3D<I> globalPt,
 		const Dim3D<I> localPt,
 		const Dim3D<I> ghost,
 		const I nc);
+	/**
+	 * \brief Set grid size and partitioning
+	 *
+	 * \param[in] globalWidth width of every MPI block
+	 * \param[in] localWidth width of local parts (DArray's in local DArrayContainer), can be different on different MPI processes
+	 * \param[in] ghost number of ghost nodes on each side of grid
+	 * \param[in] nc number of type T variables in each grid node
+	 */
+	void setSizes(
+		const Dim3D<std::vector<I> > globalWidth,
+		const Dim3D<std::vector<I> > localWidth,
+		const Dim3D<I> ghost,
+		const I nc);
+
 	/**
 	 * \brief Get local part of grid
 	 *
@@ -557,25 +580,27 @@ void DArrayScatter<T, I>::loadDataEnd() {
 
 template <typename T, typename I>
 void DArrayScatter<T, I>::setSizes(
-	const Dim3D<I> size,
-	const Dim3D<I> globalPt,
-	const Dim3D<I> localPt,
+	const Dim3D<std::vector<I> > globalWidth,
+	const Dim3D<std::vector<I> > localWidth,
 	const Dim3D<I> ghost,
 	const I nc)
 {
 #ifndef USE_MPI
-	RG_ASSERT(globalPt.x == 1 && globalPt.y == 1 && globalPt.z == 1, "Trying to use global partitioning without MPI support");
+	RG_ASSERT(globalWidth[X].size() == 1 && globalWidth[Y].size() == 1 && globalWidth[Z].size() == 1, "Trying to use global partitioning without MPI support");
 #endif
-	for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) {
-		RG_ASSERT(size[d] >= globalPt[d] * localPt[d], "Wrong grid partitioning");
-	}
-	RGCut<I>::setCutParams(size, globalPt);
+	//for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) {
+	//	RG_ASSERT(size[d] >= globalPt[d] * localPt[d], "Wrong grid partitioning");
+	//}
+	RGCut<I>::setCutParams(globalWidth);
 #ifdef USE_MPI
 	rgmpi::barrier(); // wait before destroy communicator
 	if (cartComm != MPI_COMM_NULL) {
 		rgmpi::commFree(cartComm);
 	}
-	int gp[ALL_DIRS] = {globalPt.x, globalPt.y, globalPt.z};
+	int gp[ALL_DIRS] = {
+		globalWidth[X].size(),
+		globalWidth[Y].size(),
+		globalWidth[Z].size()};
 	rgmpi::cartCreate(cartComm, gp);
 	if (cartComm == MPI_COMM_NULL) return; // make stubs if we choose to take more processes later
 	cartRank = rgmpi::commRank(cartComm);
@@ -586,7 +611,7 @@ void DArrayScatter<T, I>::setSizes(
 		if (cartPos[d] == 0) {
 			neigh[SIDE_LEFT][d] = NO_NEIGHBOUR;
 		} else {
-			--cartPos[d];			// use slow implementation, make a copy of local dac in single DArray
+			--cartPos[d]; // use slow implementation, make a copy of local dac in single DArray
 			neigh[SIDE_LEFT][d] = rgmpi::cartRank(cartComm, cartPos);
 			++cartPos[d];
 		}
@@ -604,9 +629,84 @@ void DArrayScatter<T, I>::setSizes(
 
 	// allocate memory for all DArray's
 	dac.setParts(
-		size,
-		RGCut<I>::partNodes(cartPos),
-		localPt,
+		RGCut<I>::numNodes3(),
+		localWidth(),
+		ghost,
+		RGCut<I>::partOrigin(cartPos),
+		nc
+	);
+
+#ifdef USE_MPI
+	generateSubarrayTypes();
+#endif
+}
+
+template <typename T, typename I>
+void DArrayScatter<T, I>::setSizes(
+	const Dim3D<I> size,
+	const Dim3D<I> globalPt,
+	const Dim3D<I> localPt,
+	const Dim3D<I> ghost,
+	const I nc)
+{
+	Dim3D<std::vector<I> > globalWidth;
+	for (CartDir d = X; d != ALL_DIRS; ++d) {
+		for (int i = 0; i != globalPt[d]; ++i) {
+			I val = size[d] / globalPt[d] + (i < size[d] % globalPt[d] ? 1 : 0);
+			if (val > 0)
+				globalWidth[d].push_back(val);
+		}
+	}
+
+	RGCut<I>::setCutParams(globalWidth);
+#ifdef USE_MPI
+	rgmpi::barrier(); // wait before destroy communicator
+	if (cartComm != MPI_COMM_NULL) {
+		rgmpi::commFree(cartComm);
+	}
+	int gp[ALL_DIRS] = {
+		(int)globalWidth[X].size(),
+		(int)globalWidth[Y].size(),
+		(int)globalWidth[Z].size()};
+	rgmpi::cartCreate(cartComm, gp);
+	if (cartComm == MPI_COMM_NULL) return; // make stubs if we choose to take more processes later
+	cartRank = rgmpi::commRank(cartComm);
+	rgmpi::cartCoords(cartComm, cartRank, cartPos);
+
+	// set neighbours ranks
+	for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1)) {
+		if (cartPos[d] == 0) {
+			neigh[SIDE_LEFT][d] = NO_NEIGHBOUR;
+		} else {
+			--cartPos[d]; // use slow implementation, make a copy of local dac in single DArray
+			neigh[SIDE_LEFT][d] = rgmpi::cartRank(cartComm, cartPos);
+			++cartPos[d];
+		}
+		if (cartPos[d] == RGCut<I>::numParts(d) - 1) {
+			neigh[SIDE_RIGHT][d] = NO_NEIGHBOUR;
+		} else {
+			++cartPos[d];
+			neigh[SIDE_RIGHT][d] = rgmpi::cartRank(cartComm, cartPos);
+			--cartPos[d];
+		}
+	}
+#else
+	Dim3D<I> cartPos(0, 0, 0);
+#endif
+
+	Dim3D<std::vector<I> > localWidth;
+	for (CartDir d = X; d != ALL_DIRS; ++d) {
+		for (int i = 0; i != localPt[d]; ++i) {
+			I val = globalWidth[d].at(cartPos[d]) / localPt[d] + (i < globalWidth[d].at(cartPos[d]) % localPt[d] ? 1 : 0);
+			if (val > 0)
+				localWidth[d].push_back(val);
+		}
+	}
+
+	// allocate memory for all DArray's
+	dac.setParts(
+		RGCut<I>::numNodes3(),
+		localWidth,
 		ghost,
 		RGCut<I>::partOrigin(cartPos),
 		nc
@@ -688,6 +788,7 @@ void DArrayScatter<T, I>::setAndScatter(int const processRank, DArray<T, I> cons
 		MPI_CHECK(MPI_Waitall(RGCut<I>::numParts(), &req[0], MPI_STATUSES_IGNORE));
 	}
 #else
+	(void) processRank; // suppress unused warning
 	dac.setDArray(da, dac.numParts(X), dac.numParts(Y), dac.numParts(Z));
 #endif
 }

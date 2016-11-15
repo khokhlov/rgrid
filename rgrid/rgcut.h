@@ -181,6 +181,12 @@ public:
 	Dim3D<I> partNodes(const Dim3D<I>& partPos) const {
 		return Dim3D<I>(width[X].at(partPos[X]), width[Y].at(partPos[Y]), width[Z].at(partPos[Z]));
 	}
+	/**
+	 * \brief Get new copy of width array
+	 */
+	Dim3D<std::vector<I> > getWidth() const {
+		return width;
+	}
 private:
 	/* number of parts in each direction */
 	Dim3D<I> parts;

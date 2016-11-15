@@ -59,7 +59,8 @@ public:
 	void setDArray(const DArray<T, I> &da, const I px, const I py, const I pz);
 	/**
 	 * \brief Allocate memory for DArrays
-	 * \param[in] size size of DArrayContainer
+	 * \param[in] globalSize size of area in which DArrayContainer is placed
+	 * \param[in] localSize size of DArrayContainer
 	 * \param[in] parts number of DArray's
 	 * \param[in] ghost number of ghost nodes
 	 * \param[in] origin origin of current DArrayContainer
@@ -69,6 +70,20 @@ public:
 		const Dim3D<I>& globalSize,
 		const Dim3D<I>& localSize,
 		const Dim3D<I>& parts,
+		const Dim3D<I>& ghost,
+		const Dim3D<I>& origin,
+		const I components);
+	/**
+	 * \brief Allocate memory for DArrays
+	 * \param[in] globalSize size of area in which DArrayContainer is placed
+	 * \param[in] localWidth width of DArray blocks inside DArrayContainer
+	 * \param[in] ghost number of ghost nodes
+	 * \param[in] origin origin of current DArrayContainer
+	 * \param[in] components number of components in each node
+	 */
+	void setParts(
+		const Dim3D<I>& globalSize,
+		const Dim3D<std::vector<I> >& localWidth,
 		const Dim3D<I>& ghost,
 		const Dim3D<I>& origin,
 		const I components);
@@ -297,17 +312,16 @@ void DArrayContainer<T, I>::setDArray(const DArray<T, I> &da, const I numParts) 
 template <typename T, typename I>
 void DArrayContainer<T, I>::setParts(
 	const Dim3D<I>& globalSize,
-	const Dim3D<I>& localSize,
-	const Dim3D<I>& parts,
+	const Dim3D<std::vector<I> >& localWidth,
 	const Dim3D<I>& ghost,
 	const Dim3D<I>& origin,
 	const I components)
 {
-	RGCut<I>::setCutParams(localSize.x, localSize.y, localSize.z, parts.x, parts.y, parts.z);
-	dArray.resize(parts.x * parts.y * parts.z);
-	for (I k = 0; k != parts.z; ++k)
-		for (I j = 0; j != parts.y; ++j)
-			for (I i = 0; i != parts.x; ++i) {
+	RGCut<I>::setCutParams(localWidth);
+	dArray.resize(localWidth[X].size() * localWidth[Y].size() * localWidth[Z].size());
+	for (typename std::vector<I>::size_type k = 0; k != localWidth[Z].size(); ++k)
+		for (typename std::vector<I>::size_type j = 0; j != localWidth[Y].size(); ++j)
+			for (typename std::vector<I>::size_type i = 0; i != localWidth[X].size(); ++i) {
 				I ind = RGCut<I>::linInd(i, j, k);
 				Dim3D<I> o(RGCut<I>::partOrigin(X, i), RGCut<I>::partOrigin(Y, j), RGCut<I>::partOrigin(Z, k));
 				dArray.at(ind).resize(
@@ -317,6 +331,27 @@ void DArrayContainer<T, I>::setParts(
 					ghost.x, ghost.y, ghost.z,
 					components);
 			}
+
+}
+
+template <typename T, typename I>
+void DArrayContainer<T, I>::setParts(
+	const Dim3D<I>& globalSize,
+	const Dim3D<I>& localSize,
+	const Dim3D<I>& parts,
+	const Dim3D<I>& ghost,
+	const Dim3D<I>& origin,
+	const I components)
+{
+	Dim3D<std::vector<I> > localWidth;
+	for (CartDir d = X; d != ALL_DIRS; ++d) {
+		for (int i = 0; i != parts[d]; ++i) {
+			I val = localSize[d] / parts[d] + (i < localSize[d] % parts[d] ? 1 : 0);
+			if (val > 0)
+				localWidth[d].push_back(val);
+		}
+	}
+	setParts(globalSize, localWidth, ghost, origin, components);
 }
 
 template <typename T, typename I>
