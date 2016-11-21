@@ -2,14 +2,27 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <execinfo.h>
+#include <cstdlib>
 
 using namespace std;
 
 namespace rgrid
 {
+
+void stackTrace() {
+	void * array[250];
+	int nSize = backtrace(array, 250);
+	char ** symbols = backtrace_symbols(array, nSize);
+	for (int i = 0; i < nSize; i++)
+		cerr << symbols[i] << endl;
+	free(symbols);
+}
+
 void rgassert(const char *file, const int line, const char *msg, const char *exp)
 {
-	cerr << "\033[91mERROR! " << file << ":" << line << ": " << exp << "\033[0m" << endl;
+	cerr << "\033[91mASSERT! " << file << ":" << line << ": " << exp << "\033[0m" << endl;
+	stackTrace();
 	throw logic_error(msg);
 }
 

@@ -26,9 +26,9 @@
 
 namespace rgmpi
 {
-	
+
 #ifdef USE_MPI
-/** 
+/**
  * \brief Get MPI error by code
  */
 std::string getError(const int rc);
@@ -43,7 +43,7 @@ void init(int *argc, char ***argv);
  * \brief Init MPI
  */
 void init();
-/** 
+/**
  * \brief Init MPI
  * \return Is MPI already initialized
  */
@@ -100,7 +100,7 @@ void cartCreate(MPI_Comm& cartComm, int const parts[3]);
  */
 template <typename I>
 inline void cartCreate(MPI_Comm& cartComm, rgrid::Dim3D<I> parts) {
-	const int p[3];
+	int p[3];
 	p[0] = parts.x;
 	p[1] = parts.y;
 	p[2] = parts.z;

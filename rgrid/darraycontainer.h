@@ -58,6 +58,12 @@ public:
 	 */
 	void setDArray(const DArray<T, I> &da, const I px, const I py, const I pz);
 	/**
+	 * \brief take DArray and divide into smaller DArrays in 3 dims
+	 * \param[in] da DArray to split
+	 * \param[in] width of blocks
+	 */
+	void setDArray(const DArray<T, I> &da, const Dim3D<std::vector<I> >& width);
+	/**
 	 * \brief Allocate memory for DArrays
 	 * \param[in] globalSize size of area in which DArrayContainer is placed
 	 * \param[in] localSize size of DArrayContainer
@@ -363,11 +369,39 @@ void DArrayContainer<T, I>::setDArray(const DArray<T, I> &da, const I px, const 
 			for (I i = 0; i != px; ++i) {
 				I ind = RGCut<I>::linInd(i, j, k);
 				I o[ALL_DIRS] = { RGCut<I>::partOrigin(X, i), RGCut<I>::partOrigin(Y, j), RGCut<I>::partOrigin(Z, k) };
-				dArray.at(ind).resize(da.globalSize(X), da.globalSize(Y), da.globalSize(Z),
-				                   RGCut<I>::partNodes(X, i), RGCut<I>::partNodes(Y, j), RGCut<I>::partNodes(Z, k),
-				                   da.origin(X) + o[X], da.origin(Y) + o[Y], da.origin(Z) + o[Z],
-				                   da.ghost(X), da.ghost(Y), da.ghost(Z),
-				                   da.getNC());
+				dArray.at(ind).resize(
+					da.globalSize(X), da.globalSize(Y), da.globalSize(Z),
+					RGCut<I>::partNodes(X, i), RGCut<I>::partNodes(Y, j), RGCut<I>::partNodes(Z, k),
+					da.origin(X) + o[X], da.origin(Y) + o[Y], da.origin(Z) + o[Z],
+					da.ghost(X), da.ghost(Y), da.ghost(Z),
+					da.getNC());
+				for (I cn = 0; cn != da.getNC(); ++cn)
+					for (I k2 = 0; k2 != RGCut<I>::partNodes(Z, k); ++k2)
+						for (I j2 = 0; j2 != RGCut<I>::partNodes(Y, j); ++j2)
+							for (I i2 = 0; i2 != RGCut<I>::partNodes(X, i); ++i2) {
+								dArray.at(ind)(i2, j2, k2, cn) = da(o[X] + i2, o[Y] + j2, o[Z] + k2, cn);
+							}
+			}
+}
+
+template <typename T, typename I>
+void DArrayContainer<T, I>::setDArray(const DArray<T, I> &da, const Dim3D<std::vector<I> >& width) {
+	RGCut<I>::setCutParams(width);
+	RG_ASSERT(da.localSize(X) == RGCut<I>::numNodes(X), "Number of nodes mismatch");
+	RG_ASSERT(da.localSize(Y) == RGCut<I>::numNodes(Y), "Number of nodes mismatch");
+	RG_ASSERT(da.localSize(Z) == RGCut<I>::numNodes(Z), "Number of nodes mismatch");
+	dArray.resize(RGCut<I>::numParts());
+	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
+		for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
+			for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
+				I ind = RGCut<I>::linInd(i, j, k);
+				I o[ALL_DIRS] = { RGCut<I>::partOrigin(X, i), RGCut<I>::partOrigin(Y, j), RGCut<I>::partOrigin(Z, k) };
+				dArray.at(ind).resize(
+					da.globalSize(X), da.globalSize(Y), da.globalSize(Z),
+					RGCut<I>::partNodes(X, i), RGCut<I>::partNodes(Y, j), RGCut<I>::partNodes(Z, k),
+					da.origin(X) + o[X], da.origin(Y) + o[Y], da.origin(Z) + o[Z],
+					da.ghost(X), da.ghost(Y), da.ghost(Z),
+					da.getNC());
 				for (I cn = 0; cn != da.getNC(); ++cn)
 					for (I k2 = 0; k2 != RGCut<I>::partNodes(Z, k); ++k2)
 						for (I j2 = 0; j2 != RGCut<I>::partNodes(Y, j); ++j2)

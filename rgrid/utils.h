@@ -1,4 +1,4 @@
-/** 
+/**
  * \file
  * \brief Helpful utils
  */
@@ -18,14 +18,13 @@
 /// Try to convert any object to string
 #define STR(x) rgrid::toString(x)
 
-/** 
+/**
  * \brief Check is expression is true, overwise show message and throw exception
  * \param[in] exp
  * \param[in] message
  */
 #define RG_ASSERT(exp, message) \
 	if (!(exp)) rgrid::rgassert(__FILE__, __LINE__, STR(message).c_str(), #exp);
-
 
 namespace rgrid
 {

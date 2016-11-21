@@ -98,7 +98,7 @@ int commRank(MPI_Comm comm)
 	return rank;
 }
 
-void commFree(MPI_Comm& comm) 
+void commFree(MPI_Comm& comm)
 {
 	if (comm == MPI_COMM_NULL) return;
 	MPI_CHECK(MPI_Comm_free(&comm));
@@ -132,14 +132,14 @@ void forceFinalize()
 }
 
 #ifdef USE_MPI
-void cartCreate(MPI_Comm& cartComm, int const parts[3]) 
+void cartCreate(MPI_Comm& cartComm, int const parts[3])
 {
 	int periods[3] = { false, false, false };
 	int iParts[3] = { parts[2], parts[1], parts[0] };
-	MPI_CHECK(MPI_Cart_create(MPI_COMM_WORLD, 3, iParts, periods, true, &cartComm));
+	MPI_CHECK(MPI_Cart_create(MPI_COMM_WORLD, 3, iParts, periods, false, &cartComm));
 }
 
-void cartCoords(MPI_Comm cartComm, int const rank, int coords[3]) 
+void cartCoords(MPI_Comm cartComm, int const rank, int coords[3])
 {
 	int iCoords[3];
 	MPI_CHECK(MPI_Cart_coords(cartComm, rank, 3, iCoords));
@@ -148,7 +148,7 @@ void cartCoords(MPI_Comm cartComm, int const rank, int coords[3])
 	}
 }
 
-int cartRank(MPI_Comm const cartComm, int const coords[3]) 
+int cartRank(MPI_Comm const cartComm, int const coords[3])
 {
 	int rank;
 	int iCoords[3] = { coords[2], coords[1], coords[0] };
@@ -156,9 +156,9 @@ int cartRank(MPI_Comm const cartComm, int const coords[3])
 	return rank;
 }
 
-template <> MPI_Datatype getMPItype<int>() { return MPI_INT; } 
-template <> MPI_Datatype getMPItype<float>() { return MPI_FLOAT; } 
-template <> MPI_Datatype getMPItype<double>() { return MPI_DOUBLE; } 
+template <> MPI_Datatype getMPItype<int>() { return MPI_INT; }
+template <> MPI_Datatype getMPItype<float>() { return MPI_FLOAT; }
+template <> MPI_Datatype getMPItype<double>() { return MPI_DOUBLE; }
 
 void freeSubarrayType(MPI_Datatype& dt) {
 	MPI_CHECK(MPI_Type_free(&dt));
