@@ -13,6 +13,7 @@
 #include <string>
 
 #include "rgrid/utils.h"
+#include "rgrid/types.h"
 
 #ifdef USE_MPI
 #include <mpi.h>
@@ -114,12 +115,19 @@ inline void cartCreate(MPI_Comm& cartComm, rgrid::Dim3D<I> parts) {
  */
 void cartCoords(MPI_Comm const cartComm, int const rank, int coords[3]);
 /**
+ * \brief Get coords of process with specific rank in cart comm
+ * \param[in] cartComm
+ * \param[in] rank
+ * \return coords
+ */
+rgrid::Dim3D<int> cartCoords(MPI_Comm const cartComm, int const rank);
+/**
  * \brief Get rank of process with specific coords in cart comm
  * \param[in] cartComm
  * \param[in] coords
  * \return rank
  */
-int cartRank(MPI_Comm const cartComm, int const coords[3]);
+int cartRank(MPI_Comm const cartComm, const rgrid::Dim3D<int>& coords);
 
 /**
  * \brief get MPI type corresponding to specific type

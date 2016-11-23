@@ -111,6 +111,12 @@ public:
 		return k * parts[X] * parts[Y] + j * parts[X] + i;
 	}
 	/**
+	 * \brief Get index of part in linear array
+	 */
+	I linInd(Dim3D<I> ind) const {
+		return ind.k * parts[X] * parts[Y] + ind.j * parts[X] + ind.i;
+	}
+	/**
 	 * \brief Convert linear index to vector (i,j,k)
 	 */
 	void vecInd(const I lin, I vec[ALL_DIRS]) const {
@@ -155,6 +161,17 @@ public:
 	 */
 	I locatePart(const CartDir dir, const I contIdx) const {
 		return locator[dir].upper_bound(contIdx)->second;
+	}
+	/**
+	 * \brief Locate index of part in specified direction in which specified node contained
+	 * \param[in] ind global index of node
+	 * \return Index of part
+	 */
+	Dim3D<I> locatePart(const Dim3D<I>& ind) const {
+		return Dim3D<I>(
+			locatePart(X, ind[X]),
+			locatePart(Y, ind[Y]),
+			locatePart(Z, ind[Z]));
 	}
 	/**
 	 * \brief Get origin of part

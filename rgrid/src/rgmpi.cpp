@@ -148,10 +148,27 @@ void cartCoords(MPI_Comm cartComm, int const rank, int coords[3])
 	}
 }
 
+rgrid::Dim3D<int> cartCoords(MPI_Comm const cartComm, int const rank) {
+	int iCoords[3];
+	rgrid::Dim3D<int> coords;
+	MPI_CHECK(MPI_Cart_coords(cartComm, rank, 3, iCoords));
+	for (int i = 0; i != 3; ++i) {
+		coords[static_cast<rgrid::CartDir>(2 - i)] = iCoords[static_cast<rgrid::CartDir>(i)];
+	}
+	return coords;
+}
+
 int cartRank(MPI_Comm const cartComm, int const coords[3])
 {
 	int rank;
 	int iCoords[3] = { coords[2], coords[1], coords[0] };
+	MPI_CHECK(MPI_Cart_rank(cartComm, iCoords, &rank));
+	return rank;
+}
+
+int cartRank(MPI_Comm const cartComm, const rgrid::Dim3D<int>& coords) {
+	int rank;
+	int iCoords[3] = { coords[rgrid::Z], coords[rgrid::Y], coords[rgrid::X] };
 	MPI_CHECK(MPI_Cart_rank(cartComm, iCoords, &rank));
 	return rank;
 }

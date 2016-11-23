@@ -53,7 +53,7 @@ enum CartDim {
  */
 template <typename T>
 struct Dim3D {
-	/**@{*/ 
+	/**@{*/
 	/** coordinates */
 	T x, y, z;
 	/**@}*/
@@ -64,9 +64,9 @@ struct Dim3D {
 		: x(i), y(j), z(k) {
 	}
 	Dim3D() {
-		
+
 	}
-	Dim3D(const T a[ALL_DIRS]) 
+	Dim3D(const T a[ALL_DIRS])
 		: x(a[X]), y(a[Y]), z(a[Z])
 	{
 	}
@@ -76,7 +76,7 @@ struct Dim3D {
 	T &operator[](const CartDir d) {
 		return (d == X) ? x : ((d == Y) ? y : z);
 	}
-	
+
 	/**
 	 * \brief Get coord by index X, Y or Z
 	 */
@@ -101,7 +101,7 @@ namespace rgio {
 
 /**
  * \brief Formats in which data can be stored in file
- * 
+ *
  * Header of DARRAY data format described here
  * \code{.unparsed}
  * # DARRAY DATA FORMAT
@@ -113,7 +113,7 @@ namespace rgio {
  * 'SIZE' is 3 numbers - 'X Y Z'. 'COMPONENTS' is the number of values inside node. 'FORMAT' can be 'binary' or 'text'.
  * After 'DATA START' placed all the data in binary format or in text format(values divided by spaces).
  * Number of values is X*Y*Z*C. Values placed in the next order: line of X, plane of Y, volume of Z, and after that in the same order volumes for next components.
- * 
+ *
  * Example:
  * \code{.unparsed}
  * # DARRAY DATA FORMAT
@@ -123,7 +123,7 @@ namespace rgio {
  * DATA START
  * \endcode
  */
-enum format { 
+enum format {
 	BINARY, ///< own DARRAY binary format
 	TEXT, ///< own DARRAY text format
 	CUSTOM_HEADER, ///< binary format with custom header

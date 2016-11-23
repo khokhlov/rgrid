@@ -195,6 +195,15 @@ public:
 		return data.at(PDim<I>::ind(i, j, k, cn));
 	}
 	/** 
+	 * \brief Get node component from local DArray using global coordiantes
+	 * \param[in] i,j,k global coordinates
+	 * \param[in] cn component number
+	 * \return node component
+	 */
+	T &gv(const I i, const I j, const I k, const I cn) {
+		return data.at(PDim<I>::localFromGlobal(i, j, k, cn));
+	}
+	/** 
 	 * \brief Get node component at specified position in 2D DArray
 	 * \param[in] i,j coordinate
 	 * \param[in] cn component number

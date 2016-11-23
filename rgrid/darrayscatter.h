@@ -247,12 +247,19 @@ public:
 	 * \param[in] d direction
 	 * \return position of current process in cartesian communicator in direction d
 	 */
-	int getInternalPos(CartDir d) {
+	int getInternalPos(CartDir d) const {
 #ifdef USE_MPI
 		return cartPos[d];
 #else
 		(void)d;
 		return 0;
+#endif
+	}
+	Dim3D<int> getInternalPos() const {
+#ifdef USE_MPI
+		return cartPos;
+#else
+		return Dim3D<int>(0,0,0);
 #endif
 	}
 	/**
@@ -352,7 +359,35 @@ public:
 	 * \sa loadDataBegin
 	 */
 	void loadDataEnd();
+	/**
+	 * \breif Get internal communicator
+	 */
+	MPI_Comm& getCartComm() {
+		return cartComm;
+	}
 #endif
+	/**
+	 * \brief Check is global index present in current container
+	 * \param[in] ind global index
+	 */
+	bool isPresent(const Dim3D<I>& ind) const {
+		const Dim3D<I>& o = RGCut<I>::partOrigin(cartPos);
+		const Dim3D<I>& w = RGCut<I>::partNodes(cartPos);
+		return
+			o.x <= ind.x && ind.x < o.x + w.x &&
+			o.y <= ind.y && ind.y < o.y + w.y &&
+			o.z <= ind.z && ind.z < o.z + w.z;
+	}
+	/**
+	 * \brief Convert global (DAS) index to local (DAC)
+	 * \param[in] ind global index
+	 * \return local index
+	 */
+	Dim3D<I> localInd(const Dim3D<I>& ind) const {
+		RG_ASSERT(isPresent(ind), "Trying to get index which is not present in current container");
+		const Dim3D<I>& o = RGCut<I>::partOrigin(cartPos);
+		return Dim3D<I>(ind.x - o.x, ind.y - o.y, ind.z - o.z);
+	}
 private:
 
 	DArrayScatter(DArrayScatter const &);
@@ -397,8 +432,12 @@ private:
 	/* temp DArray for save/load */
 	DArray<T, I> tda;
 
+#endif
+
 	/* position of local DArrayContainer */
-	I cartPos[ALL_DIRS];
+	Dim3D<I> cartPos;
+
+#ifdef USE_MPI
 	/* rank of current process in cart comm */
 	int cartRank;
 
@@ -593,7 +632,8 @@ void DArrayScatter<T, I>::cartCreate(const Dim3D<I>& parts) {
 	rgmpi::cartCreate(cartComm, parts);
 	if (cartComm == MPI_COMM_NULL) return; // make stubs if we choose to take more processes later
 	cartRank = rgmpi::commRank(cartComm);
-	rgmpi::cartCoords(cartComm, cartRank, cartPos);
+	//rgmpi::cartCoords(cartComm, cartRank, cartPos);
+	cartPos = rgmpi::cartCoords(cartComm, cartRank);
 }
 #endif
 
@@ -631,7 +671,7 @@ void DArrayScatter<T, I>::setSizes(
 		}
 	}
 #else
-	Dim3D<I> cartPos(0, 0, 0);
+	cartPos = Dim3D<I>(0, 0, 0);
 #endif
 
 	// allocate memory for all DArray's
