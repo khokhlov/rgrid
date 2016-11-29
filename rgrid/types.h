@@ -83,6 +83,15 @@ struct Dim3D {
 	T operator[](const CartDir d) const {
 		return (d == X) ? x : ((d == Y) ? y : z);
 	}
+
+	template <typename U>
+	operator Dim3D<U>() const {
+		Dim3D<U> t;
+		t.x = static_cast<U>(x);
+		t.y = static_cast<U>(y);
+		t.z = static_cast<U>(z);
+		return t;
+	}
 };
 
 /// Check is two Dim3D equal
@@ -126,7 +135,7 @@ namespace rgio {
 enum format {
 	BINARY, ///< own DARRAY binary format
 	TEXT, ///< own DARRAY text format
-	CUSTOM_HEADER, ///< binary format with custom header
+	CUSTOM_HEADER ///< binary format with custom header
 };
 
 } // namespace rgio

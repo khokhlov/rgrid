@@ -18,9 +18,9 @@ namespace rgrid {
 
 /**
  * \brief This class responsible for sizes of DArrays
- * 
+ *
  * This class has the same behaviour as PDimRaw, but support easier way for resizing
- * 
+ *
  * \tparam T type of indexes (i.e. int, long)
  * \sa DArray
  */
@@ -28,9 +28,9 @@ template <typename T>
 struct PDim : public PDimRaw<T> {
 	/**
 	 * \brief Set new sizes to rectangular structure
-	 * 
+	 *
 	 * The most verbose version
-	 * 
+	 *
 	 * \param[in] x,y,z size of bigger rectangular structure
 	 * \param[in] px,py,pz size of current DArray
 	 * \param[in] ox,oy,oz origin of current DArray in bigger structure
@@ -48,14 +48,14 @@ struct PDim : public PDimRaw<T> {
 	virtual void resize(const PDim<T> &p);
 	/**
 	 * \brief Set new sizes to rectangular structure
-	 * 
+	 *
 	 * \param[in] x,y,z size of bigger rectangular structure
 	 * \param[in] cn number of components
 	 */
 	virtual void resize(const T x, const T y, const T z, const T cn);
 	/**
 	 * \brief Set new sizes to rectangular structure
-	 * 
+	 *
 	 * \param[in] x,y,z size of bigger rectangular structure
 	 * \param[in] gx,gy,gz number of ghost nodes on each side
 	 * \param[in] cn number of components
@@ -65,7 +65,7 @@ struct PDim : public PDimRaw<T> {
 	                    const T cn);
 	/**
 	 * \brief Set new sizes to rectangular structure
-	 * 
+	 *
 	 * \param[in] d1,d2,d3 different dimensions in any order
 	 * \param[in] s1,s2,s3 size of DArray in the same order as in d1,d2,d3
 	 * \param[in] cn number of components
@@ -88,9 +88,9 @@ struct PDim : public PDimRaw<T> {
 	}
 	/**
 	 * \brief Set new sizes to rectangular structure
-	 * 
-	 * The most verbose constructor 
-	 * 
+	 *
+	 * The most verbose constructor
+	 *
 	 * \param[in] x,y,z size of bigger rectangular structure
 	 * \param[in] px,py,pz size of current DArray
 	 * \param[in] ox,oy,oz origin of current DArray in bigger structure
@@ -117,7 +117,7 @@ struct PDim : public PDimRaw<T> {
 		resize(rhs);
 		return *this;
 	}
-	
+
 	virtual ~PDim() {}
 }; // PDim
 
@@ -198,7 +198,7 @@ void PDim<T>::resize(const T x, const T y, const T z, const T px, const T py, co
 	PDimRaw<T>::m_local_stride[Z] = PDimRaw<T>::m_local_ghost_size[X] * PDimRaw<T>::m_local_ghost_size[Y];
 }
 
-}; // rgrid
+} // rgrid
 
 #endif // RGRID_PDIM_H
 

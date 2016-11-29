@@ -137,14 +137,89 @@ public:
 	}
 
 	/**
+	 * \brief Check is index present in current container.
+	 *
+	 * Ghost nodes are not taken in consideration.
+	 * \param[in] ind index in container
+	 */
+	bool isPresent(const Dim3D<I>& ind) const {
+		const Dim3D<I>& e = RGCut<I>::numNodes3();
+		return
+			0 <= ind.x && ind.x < e.x &&
+			0 <= ind.y && ind.y < e.y &&
+			0 <= ind.z && ind.z < e.z;
+	}
+
+	/**
+	 * \brief Check is index present in current container.
+	 *
+	 * Include ghost nodes of container.
+	 * \param[in] ind index in container
+	 */
+	bool isPresentGhost(const Dim3D<I>& ind) const {
+		const Dim3D<I>& e = RGCut<I>::numNodes3();
+		return
+			-getNGhost(X) <= ind.x && ind.x < e.x + getNGhost(X) &&
+			-getNGhost(Y) <= ind.y && ind.y < e.y + getNGhost(Y) &&
+			-getNGhost(Z) <= ind.z && ind.z < e.z + getNGhost(Z);
+	}
+
+	/**
 	 * \brief get node in entire DArray when it splitted
 	 * \param[in] i,j,k coordinates of nodes in dimensions (X,Y,Z)
 	 * \param[in] cn component number
 	 * \return node
 	 */
-	inline T &getNode(const I i, const I j, const I k, const I cn) {
-		I pn[ALL_DIRS] = { RGCut<I>::locatePart(X, i), RGCut<I>::locatePart(Y, j), RGCut<I>::locatePart(Z, k) };
-		I idx[ALL_DIRS] = { RGCut<I>::locateIndex(X, i), RGCut<I>::locateIndex(Y, j), RGCut<I>::locateIndex(Z, k) };
+	T& getNode(const I i, const I j, const I k, const I cn) {
+		return getNode(Dim3D<I>(i, j, k), cn);
+	}
+	/**
+	 * \brief Get Node by index in container.
+	 *
+	 * Ghost nodes are not taken in consideration.
+	 * \param[in] ind index in container
+	 * \param[in] cn component number
+	 * \return node
+	 */
+	T &getNode(const Dim3D<I>& ind, const I cn) {
+		RG_ASSERT(isPresent(ind), "Trying to get index out of current block");
+		Dim3D<I> pn(
+			RGCut<I>::locatePart(X, ind.x),
+			RGCut<I>::locatePart(Y, ind.y),
+			RGCut<I>::locatePart(Z, ind.z));
+		Dim3D<I> idx(
+			RGCut<I>::locateIndex(X, ind.x),
+			RGCut<I>::locateIndex(Y, ind.y),
+			RGCut<I>::locateIndex(Z, ind.z));
+		return getDArrayPart(pn[X], pn[Y], pn[Z]).val(idx[X], idx[Y], idx[Z], cn);
+	}
+	/**
+	 * \brief get node in entire DArray when it splitted
+	 *
+	 * Include ghost nodes of container.
+	 * \param[in] ind index in container
+	 * \param[in] cn component number
+	 * \return node
+	 */
+	T &getNodeGhost(const Dim3D<I>& ind, const I cn) {
+		RG_ASSERT(isPresentGhost(ind), "Trying to get index out of current block");
+		Dim3D<I> ind2 = ind;
+		for (CartDir d = X; d != ALL_DIRS; ++d) {
+			if (ind[d] < 0) ind2[d] = 0;
+			if (ind[d] >= RGCut<I>::numNodes(d)) ind2[d] = RGCut<I>::numNodes(d) - 1;
+		}
+		Dim3D<I> pn(
+			RGCut<I>::locatePart(X, ind2.x),
+			RGCut<I>::locatePart(Y, ind2.y),
+			RGCut<I>::locatePart(Z, ind2.z));
+		Dim3D<I> idx(
+			RGCut<I>::locateIndex(X, ind2.x),
+			RGCut<I>::locateIndex(Y, ind2.y),
+			RGCut<I>::locateIndex(Z, ind2.z));
+		for (CartDir d = X; d != ALL_DIRS; ++d) {
+			if (ind[d] < 0) idx[d] -= ind2[d] - ind[d];
+			if (ind[d] >= RGCut<I>::numNodes(d)) idx[d] += ind[d] - ind2[d];
+		}
 		return getDArrayPart(pn[X], pn[Y], pn[Z]).val(idx[X], idx[Y], idx[Z], cn);
 	}
 

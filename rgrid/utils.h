@@ -50,6 +50,6 @@ template <typename T> std::string toString(const T& x)
 	return oss.str();
 }
 
-};
+}
 
 #endif // RGRID_UTILS_H

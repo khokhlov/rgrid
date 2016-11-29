@@ -367,7 +367,9 @@ public:
 	}
 #endif
 	/**
-	 * \brief Check is global index present in current container
+	 * \brief Check is global index present in current container.
+	 *
+	 * Ghost nodes are not taken in consideration.
 	 * \param[in] ind global index
 	 */
 	bool isPresent(const Dim3D<I>& ind) const {
@@ -377,6 +379,96 @@ public:
 			o.x <= ind.x && ind.x < o.x + w.x &&
 			o.y <= ind.y && ind.y < o.y + w.y &&
 			o.z <= ind.z && ind.z < o.z + w.z;
+	}
+	/**
+	 * \brief Check is global index present in current container.
+	 *
+	 * Include ghost nodes of entire DAS, but not include.
+	 * ghost nodes of current container
+	 * \param[in] ind global index
+	 */
+	bool isPresentGhostGlobal(const Dim3D<I>& ind) const {
+		Dim3D<I> o = RGCut<I>::partOrigin(cartPos);
+		const Dim3D<I>& w = RGCut<I>::partNodes(cartPos);
+		Dim3D<I> e(o.x + w.x, o.y + w.y, o.z + w.z);
+		for (CartDir d = X; d != ALL_DIRS; ++d) {
+			if (cartPos[d] == 0) o[d] -= getNGhost(d);
+			if (cartPos[d] == RGCut<I>::numParts(d) - 1) e[d] += getNGhost(d);
+		}
+		return
+			o.x <= ind.x && ind.x < e.x &&
+			o.y <= ind.y && ind.y < e.y &&
+			o.z <= ind.z && ind.z < e.z;
+	}
+	/**
+	 * \brief Check is global index present in current container.
+	 *
+	 * Include ghost nodes of container.
+	 * \param[in] ind global index
+	 */
+	bool isPresentGhostLocal(const Dim3D<I>& ind) const {
+		Dim3D<I> o = RGCut<I>::partOrigin(cartPos);
+		const Dim3D<I>& w = RGCut<I>::partNodes(cartPos);
+		Dim3D<I> e(o.x + w.x, o.y + w.y, o.z + w.z);
+		for (CartDir d = X; d != ALL_DIRS; ++d) {
+			o[d] -= getNGhost(d);
+			e[d] += getNGhost(d);
+		}
+		return
+			o.x <= ind.x && ind.x < e.x &&
+			o.y <= ind.y && ind.y < e.y &&
+			o.z <= ind.z && ind.z < e.z;
+	}
+	/*
+	 * \brief Get Node by global index.
+	 * \param[in] ind global index
+	 * \param[in] nc number of component
+	 */
+	T& getNode(const Dim3D<I>& ind, const I nc) {
+		RG_ASSERT(isPresent(ind), "Trying to get index out of current block");
+		Dim3D<I> o = RGCut<I>::partOrigin(cartPos);
+		const Dim3D<I> locInd(ind.x - o.x, ind.y - o.y, ind.z - o.z);
+		return dac.getNode(locInd, nc);
+	}
+	/*
+	 * \brief Get Node by global index.
+	 *
+	 * Include ghost nodes of entire DAS, but not include.
+	 * ghost nodes of current container
+	 * \param[in] ind global index
+	 * \param[in] nc number of component
+	 */
+	T& getNodeGhostLocal(const Dim3D<I>& ind, const I nc) {
+		if (!isPresentGhostLocal(ind)) {
+			std::cout << ind[X] << " " << ind[Y] << " " << ind[Z]<< std::endl;
+			Dim3D<I> o = RGCut<I>::partOrigin(cartPos);
+			Dim3D<I> w = RGCut<I>::partNodes(cartPos);
+			Dim3D<I> e(o.x + w.x, o.y + w.y, o.z + w.z);
+			std::cout << "ghost: " << getNGhost(X) << " " << getNGhost(Y) << " " << getNGhost(Z) << std::endl;
+			for (CartDir d = X; d != ALL_DIRS; ++d) {
+				o[d] -= getNGhost(d);
+				e[d] += getNGhost(d);
+			}
+			std::cout << o[X] << " " << o[Y] << " " << o[Z]<< std::endl;
+			std::cout << e[X] << " " << e[Y] << " " << e[Z]<< std::endl;
+		}
+		RG_ASSERT(isPresentGhostLocal(ind), "Trying to get index out of current block");
+		Dim3D<I> o = RGCut<I>::partOrigin(cartPos);
+		const Dim3D<I> locInd(ind.x - o.x, ind.y - o.y, ind.z - o.z);
+		return dac.getNodeGhost(locInd, nc);
+	}
+	/*
+	 * \brief Get Node by global index
+	 *
+	 * Include ghost nodes of container.
+	 * \param[in] ind global index
+	 * \param[in] nc number of component
+	 */
+	T& getNodeGhostGlobal(const Dim3D<I>& ind, const I nc) {
+		RG_ASSERT(isPresentGhostGlobal(ind), "Trying to get index out of current block");
+		Dim3D<I> o = RGCut<I>::partOrigin(cartPos);
+		const Dim3D<I> locInd(ind.x - o.x, ind.y - o.y, ind.z - o.z);
+		return dac.getNodeGhost(locInd, nc);
 	}
 	/**
 	 * \brief Convert global (DAS) index to local (DAC)
@@ -731,7 +823,7 @@ void DArrayScatter<T, I>::setSizes(
 		}
 	}
 #else
-	Dim3D<I> cartPos(0, 0, 0);
+	cartPos = Dim3D<I>(0, 0, 0);
 #endif
 
 	Dim3D<std::vector<I> > localWidth;
@@ -846,26 +938,26 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 	for (I k = 0; k != RGCut<I>::numParts(Z); ++k)
 		for (I j = 0; j != RGCut<I>::numParts(Y); ++j)
 			for (I i = 0; i != RGCut<I>::numParts(X); ++i) {
-				int cartRank3[ALL_DIRS] = { i, j, k };
+				Dim3D<I> cartRank3(i, j, k);
 				int rank = rgmpi::cartRank(cartComm, cartRank3);
 				{
 					// generate subArrayDt
 					int array_of_sizes[4] = {
-						RGCut<I>::numNodes(X) + 2 * getNGhost(X),
-						RGCut<I>::numNodes(Y) + 2 * getNGhost(Y),
-						RGCut<I>::numNodes(Z) + 2 * getNGhost(Z),
-						getNC()
+						static_cast<int>(RGCut<I>::numNodes(X) + 2 * getNGhost(X)),
+						static_cast<int>(RGCut<I>::numNodes(Y) + 2 * getNGhost(Y)),
+						static_cast<int>(RGCut<I>::numNodes(Z) + 2 * getNGhost(Z)),
+						static_cast<int>(getNC())
 					};
 					int array_of_subsizes[4] = {
-						RGCut<I>::partNodes(X, i),
-						RGCut<I>::partNodes(Y, j),
-						RGCut<I>::partNodes(Z, k),
-						getNC()
+						static_cast<int>(RGCut<I>::partNodes(X, i)),
+						static_cast<int>(RGCut<I>::partNodes(Y, j)),
+						static_cast<int>(RGCut<I>::partNodes(Z, k)),
+						static_cast<int>(getNC())
 					};
 					int array_of_starts[4] = {
-						getNGhost(X) + RGCut<I>::partOrigin(X, i),
-						getNGhost(Y) + RGCut<I>::partOrigin(Y, j),
-						getNGhost(Z) + RGCut<I>::partOrigin(Z, k),
+						static_cast<int>(getNGhost(X) + RGCut<I>::partOrigin(X, i)),
+						static_cast<int>(getNGhost(Y) + RGCut<I>::partOrigin(Y, j)),
+						static_cast<int>(getNGhost(Z) + RGCut<I>::partOrigin(Z, k)),
 						0
 					};
 					subArrayDt[rank] = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
@@ -873,38 +965,40 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 				{
 					// generate arrayDt
 					int array_of_sizes[4] = {
-						RGCut<I>::partNodes(X, i) + 2 * getNGhost(X),
-						RGCut<I>::partNodes(Y, j) + 2 * getNGhost(Y),
-						RGCut<I>::partNodes(Z, k) + 2 * getNGhost(Z),
-						getNC()
-					};
+						static_cast<int>(RGCut<I>::partNodes(X, i) + 2 * getNGhost(X)),
+						static_cast<int>(RGCut<I>::partNodes(Y, j) + 2 * getNGhost(Y)),
+						static_cast<int>(RGCut<I>::partNodes(Z, k) + 2 * getNGhost(Z)),
+						static_cast<int>(getNC())};
 					int array_of_subsizes[4] = {
-						RGCut<I>::partNodes(X, i),
-						RGCut<I>::partNodes(Y, j),
-						RGCut<I>::partNodes(Z, k),
-						getNC()
-					};
-					int array_of_starts[4] = { getNGhost(X), getNGhost(Y), getNGhost(Z), 0 };
+						static_cast<int>(RGCut<I>::partNodes(X, i)),
+						static_cast<int>(RGCut<I>::partNodes(Y, j)),
+						static_cast<int>(RGCut<I>::partNodes(Z, k)),
+						static_cast<int>(getNC())};
+					int array_of_starts[4] = {
+						static_cast<int>(getNGhost(X)),
+						static_cast<int>(getNGhost(Y)),
+						static_cast<int>(getNGhost(Z)),
+						0};
 					arrayDt[rank] = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
 				}
 			}
 	// make view type
 	int array_of_sizes[4] = {
-		RGCut<I>::numNodes(X),
-		RGCut<I>::numNodes(Y),
-		RGCut<I>::numNodes(Z),
-		getNC()
+		static_cast<int>(RGCut<I>::numNodes(X)),
+		static_cast<int>(RGCut<I>::numNodes(Y)),
+		static_cast<int>(RGCut<I>::numNodes(Z)),
+		static_cast<int>(getNC())
 	};
 	int array_of_subsizes[4] = {
-		RGCut<I>::partNodes(X, cartPos[X]),
-		RGCut<I>::partNodes(Y, cartPos[Y]),
-		RGCut<I>::partNodes(Z, cartPos[Z]),
-		getNC()
+		static_cast<int>(RGCut<I>::partNodes(X, cartPos[X])),
+		static_cast<int>(RGCut<I>::partNodes(Y, cartPos[Y])),
+		static_cast<int>(RGCut<I>::partNodes(Z, cartPos[Z])),
+		static_cast<int>(getNC())
 	};
 	int array_of_starts[4] = {
-		RGCut<I>::partOrigin(X, cartPos[X]),
-		RGCut<I>::partOrigin(Y, cartPos[Y]),
-		RGCut<I>::partOrigin(Z, cartPos[Z]),
+		static_cast<int>(RGCut<I>::partOrigin(X, cartPos[X])),
+		static_cast<int>(RGCut<I>::partOrigin(Y, cartPos[Y])),
+		static_cast<int>(RGCut<I>::partOrigin(Z, cartPos[Z])),
 		0
 	};
 	viewType = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
@@ -914,21 +1008,21 @@ void DArrayScatter<T, I>::generateSubarrayTypes() {
 			for (I i = 0; i != dac.numParts(X); ++i) {
 				// type for local DArrays
 				int array_of_sizes[4] = {
-					dac.partNodes(X, i) + 2 * getNGhost(X),
-					dac.partNodes(Y, j) + 2 * getNGhost(Y),
-					dac.partNodes(Z, k) + 2 * getNGhost(Z),
-					getNC()
+					static_cast<int>(dac.partNodes(X, i) + 2 * getNGhost(X)),
+					static_cast<int>(dac.partNodes(Y, j) + 2 * getNGhost(Y)),
+					static_cast<int>(dac.partNodes(Z, k) + 2 * getNGhost(Z)),
+					static_cast<int>(getNC())
 				};
 				int array_of_subsizes[4] = {
-					dac.partNodes(X, i),
-					dac.partNodes(Y, j),
-					dac.partNodes(Z, k),
-					getNC()
+					static_cast<int>(dac.partNodes(X, i)),
+					static_cast<int>(dac.partNodes(Y, j)),
+					static_cast<int>(dac.partNodes(Z, k)),
+					static_cast<int>(getNC())
 				};
 				int array_of_starts[4] = {
-					getNGhost(X),
-					getNGhost(Y),
-					getNGhost(Z),
+					static_cast<int>(getNGhost(X)),
+					static_cast<int>(getNGhost(Y)),
+					static_cast<int>(getNGhost(Z)),
 					0
 				};
 				locArrayDt.at(dac.linInd(i, j, k)) = rgmpi::createSubarrayType<T>(array_of_sizes, array_of_subsizes, array_of_starts);
@@ -1046,16 +1140,20 @@ void DArrayScatter<T, I>::externalSyncStart() {
 					DArray<T,I>& cda = dac.getDArrayPart(locIdx.x, locIdx.y, locIdx.z);
 					// TODO don't generate types in every sync
 					int sizes[4] = {
-						cda.localGhostSize(X),
-						cda.localGhostSize(Y),
-						cda.localGhostSize(Z),
-						getNC()
+						static_cast<int>(cda.localGhostSize(X)),
+						static_cast<int>(cda.localGhostSize(Y)),
+						static_cast<int>(cda.localGhostSize(Z)),
+						static_cast<int>(getNC())
 					};
-					int subsizes[4] = { 0, 0, 0, getNC() };
+					int subsizes[4] = { 0, 0, 0, static_cast<int>(getNC()) };
 					subsizes[d] = getNGhost(d);
 					subsizes[ort1] = cda.localSize(ort1);
 					subsizes[ort2] = cda.localSize(ort2);
-					int starts[4] = { getNGhost(X), getNGhost(Y), getNGhost(Z), 0 };
+					int starts[4] = {
+						static_cast<int>(getNGhost(X)),
+						static_cast<int>(getNGhost(Y)),
+						static_cast<int>(getNGhost(Z)),
+						0 };
 					// types for ghost nodes in current DArray (recv to this nodes)
 					starts[d] = (s == SIDE_LEFT) ? 0 : cda.localGhostSize(d) - getNGhost(d);
 					MPI_Datatype ghostDT = rgmpi::createSubarrayType<T>(sizes, subsizes, starts);
