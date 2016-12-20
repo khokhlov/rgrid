@@ -1128,7 +1128,7 @@ void DArrayScatter<T, I>::externalSyncStart() {
 	if (cartComm == MPI_COMM_NULL) return;
 	for (CartSide s = SIDE_LEFT; s != SIDE_ALL; s = static_cast<CartSide>(s + 1))
 		for (CartDir d = X; d != ALL_DIRS; d = static_cast<CartDir>(d + 1))
-			if (neigh[s][d] != NO_NEIGHBOUR) {
+			if (neigh[s][d] != NO_NEIGHBOUR && getNGhost(d) != 0) {
 				CartDir ort1, ort2;
 				ortDirs(d, ort1, ort2);
 				if (dac.numParts(ort1) == 1 && dac.numParts(ort2) == 1) {
