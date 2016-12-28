@@ -177,13 +177,21 @@ public:
 	 * \brief Get origin of part
 	 */
 	I partOrigin(const CartDir dir, const I partNum) const {
-		return start[dir].at(partNum);
+		#ifdef DEBUG
+			return start[dir].at(partNum);
+		#else
+			return start[dir][partNum];
+		#endif
 	}
 	/**
 	 * \brief Get origin of part
 	 */
 	Dim3D<I> partOrigin(const Dim3D<I>& partNum) const {
-		return Dim3D<I>(start[X].at(partNum[X]), start[Y].at(partNum[Y]), start[Z].at(partNum[Z]));
+		#ifdef DEBUG
+			return Dim3D<I>(start[X].at(partNum[X]), start[Y].at(partNum[Y]), start[Z].at(partNum[Z]));
+		#else
+			return Dim3D<I>(start[X][partNum[X]], start[Y][partNum[Y]], start[Z][partNum[Z]]);
+		#endif
 	}
 	/**
 	 * \brief Get part nodes number
