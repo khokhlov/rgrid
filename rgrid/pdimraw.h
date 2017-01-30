@@ -13,7 +13,7 @@ namespace rgrid {
 
 /**
  * \brief This class responsible for sizes of DArray's
- * 
+ *
  * This class is helpful because it can be used inside OpenCL kernels (When T is POD type, PDimRaw also POD type)
  * \tparam T type of indexes (i.e. int, long)
  * \sa DArray
@@ -93,7 +93,7 @@ struct PDimRaw {
 	}
 
 	/**
-	 * \brief Get origin of current rectangular structure inside bigger rectangular structure in specific direction 
+	 * \brief Get origin of current rectangular structure inside bigger rectangular structure in specific direction
 	 * \param[in] d direction
 	 * \return origin
 	 */
@@ -139,7 +139,7 @@ struct PDimRaw {
 	T indNoGhost(const T x, const T y, const T z, const T cn);
 
 	/**
-	 * \brief Convert index in local rect struct to index in bigger rect struct 
+	 * \brief Convert index in local rect struct to index in bigger rect struct
 	 * \param[in] index in local rect struct
 	 * \param[in] dir direction
 	 * \return index in bigger rect struct
@@ -189,57 +189,30 @@ struct PDimRaw {
 	 * \param[in] index in global rect struct
 	 * \param[in] dir direction of index
 	 */
-	bool check(const T index, const CartDir dir);
-	/**
-	 * \sa rgrid::PDimRaw< T >::check(const T index, const CartDir dir)
-	 */
-	bool check(const T i) {
-		return check(i, X);
-	}
-	/**
-	 * \sa rgrid::PDimRaw< T >::check(const T index, const CartDir dir)
-	 */
-	bool check(const T i, const T j) {
-		return check(i, X) && check(j, Y);
-	}
-	/**
-	 * \sa rgrid::PDimRaw< T >::check(const T index, const CartDir dir)
-	 */
-	bool check(const T i, const T j, const T k) {
-		return check(i, X) && check(j, Y) && check(k, Z);
+	bool check(const T index, const CartDir dir) const;
+	bool check(const T i, const T j, const T k, const T cn) const {
+		return check(i, X) && check(j, Y) && check(k, Z) && (0 <= cn && cn < m_nc);
 	}
 	/**
 	 * \brief The same as check(), but index can be inside ghost nodes of local rect struct
 	 */
-	bool checkg(const T index, const CartDir dir);
+	bool checkg(const T index, const CartDir dir) const;
 	/**
 	 * \brief The same as check(), but index can be inside ghost nodes of local rect struct
 	 */
-	bool checkg(const T i) {
-		return checkg(i, X);
-	}
-	/**
-	 * \brief The same as check(), but index can be inside ghost nodes of local rect struct
-	 */
-	bool checkg(const T i, const T j) {
-		return checkg(i, X) && checkg(j, Y);
-	}
-	/**
-	 * \brief The same as check(), but index can be inside ghost nodes of local rect struct
-	 */
-	bool checkg(const T i, const T j, const T k) {
-		return checkg(i, X) && checkg(j, Y) && checkg(k, Z);
+	bool checkg(const T i, const T j, const T k, const T cn) const {
+		return checkg(i, X) && checkg(j, Y) && checkg(k, Z) && (0 <= cn && cn < m_nc);
 	}
 	/**
 	 * \brief Check is index in local rect struct in one of corners of global rect struct
 	 * \param[in] d1,d2,d3 different directions in any order
-	 * \param[in] i1,i2,i3 coordinates in local rect struct in the same order as d1,d2,d3 
+	 * \param[in] i1,i2,i3 coordinates in local rect struct in the same order as d1,d2,d3
 	 */
 	bool isCorner(const T i1, const CartDir d1, const T i2, const CartDir d2, const T i3, const CartDir d3);
 	/**
 	 * \brief Check is index in local rect struct in one of edges of global rect struct
 	 * \param[in] d1,d2,d3 different directions in any order
-	 * \param[in] i1,i2,i3 coordinates in local rect struct in the same order as d1,d2,d3 
+	 * \param[in] i1,i2,i3 coordinates in local rect struct in the same order as d1,d2,d3
 	 */
 	bool isEdge(const T i1, const CartDir d1, const T i2, const CartDir d2, const T i3, const CartDir d3);
 	/**
@@ -277,15 +250,15 @@ struct PDimRaw {
 	T getNC() const {
 		return m_nc;
 	};
-	
+
 	/**
 	 * \brief Check is this rect structure has the same sizes as the other
 	 */
 	bool isEqual(const PDimRaw<T>& rhs) const {
 		return isEqualNoGhost(rhs) && (m_ghost_size == rhs.m_ghost_size);
 	}
-	
-	/** 
+
+	/**
 	 * \brief Check is this rect structure has the same sizes as the other,
 	 * but not check size of ghost nodes
 	 */
@@ -320,9 +293,9 @@ struct PDimRaw {
 	T m_local_ghost_size_all;
 	/// origins of local rect struct in global rect struct
 	Dim3D<T> m_origin;
-	
+
 	/// Number of components
-	T m_nc; 
+	T m_nc;
 }; // PDimRaw
 
 template <typename T>
@@ -383,12 +356,12 @@ bool PDimRaw<T>::isEdge(const T i1, const CartDir d1, const T i2, const CartDir 
 }
 
 template <typename T>
-bool PDimRaw<T>::check(const T index, const CartDir dir) {
+bool PDimRaw<T>::check(const T index, const CartDir dir) const {
 	return index >= m_origin[dir] && index < m_origin[dir] + m_local_size[dir];
 }
 
 template <typename T>
-bool PDimRaw<T>::checkg(const T index, const CartDir dir) {
+bool PDimRaw<T>::checkg(const T index, const CartDir dir) const {
 	return index >= -m_ghost_size[dir] + m_origin[dir] && index < m_origin[dir] + m_local_size[dir] + m_ghost_size[dir];
 }
 

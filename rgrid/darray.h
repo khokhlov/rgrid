@@ -193,8 +193,26 @@ public:
 	 */
 	T &val(const I i, const I j, const I k, const I cn) {
 		#ifdef DEBUG
+			RG_ASSERT(this->checkg(i, j, k, cn), "Indexing out of darray");
 			try {
 				return data.at(PDim<I>::ind(i, j, k, cn));
+			} catch(const std::out_of_range& e) {
+				std::cerr << "Indexing out of data array" << std::endl;
+				std::cerr << "i = " << i << "/ max i = " << PDim<I>::localSize(X);
+				std::cerr << "j = " << j << "/ max j = " << PDim<I>::localSize(Y);
+				std::cerr << "k = " << k << "/ max k = " << PDim<I>::localSize(Z);
+				std::cerr << "cn = " << cn << "/ max cn = " << PDim<I>::getNC();
+				throw e;
+			}
+		#else
+			return data[PDim<I>::ind(i, j, k, cn)];
+		#endif
+	}
+	const T &val(const I i, const I j, const I k, const I cn) const {
+		#ifdef DEBUG
+			RG_ASSERT(this->checkg(i, j, k, cn), "Indexing out of darray");
+			try {
+				return data.at(this->ind(i, j, k, cn));
 			} catch(const std::out_of_range& e) {
 				std::cerr << "Indexing out of data array" << std::endl;
 				std::cerr << "i = " << i << "/ max i = " << PDim<I>::localSize(X);
@@ -266,7 +284,7 @@ public:
 	 * \brief Equivalent to val()
 	 */
 	const T &operator()(const I i, const I j, const I k, const I cn) const {
-		return data[PDim<I>::ind(i, j, k, cn)];
+		return val(i, j, k, cn);
 	}
 	/**
 	 * \brief Equivalent to val()
