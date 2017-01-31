@@ -16,9 +16,7 @@ namespace Catch {
 	std::ostringstream emptyoss;
 	std::ostream& cout() {
 		int rank = 0;
-#ifdef USE_MPI
 		rank = rgmpi::worldRank();
-#endif
 		if (rank == 0) {
 			return std::cout;
 		} else {
@@ -27,9 +25,7 @@ namespace Catch {
 	}
 	std::ostream& cerr() {
 		int rank = 0;
-#ifdef USE_MPI
 		rank = rgmpi::worldRank();
-#endif
 		if (rank == 0) {
 			return std::cerr;
 		} else {
@@ -40,15 +36,11 @@ namespace Catch {
 
 int main(int argc, char** argv)
 {
-#ifdef USE_MPI
 	rgmpi::init(&argc, &argv);
-#endif
 
 	int result = Catch::Session().run(argc, argv);
 
-#ifdef USE_MPI
 	rgmpi::forceFinalize();
-#endif
 
 	return result;
 }
