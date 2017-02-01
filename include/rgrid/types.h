@@ -37,6 +37,11 @@ enum CartSide {
 	SIDE_UNDEFINED
 };
 
+inline const CartSide& operator++(CartSide& d) {
+	d = static_cast<CartSide>(d + 1);
+	return d;
+}
+
 /**
  * CartDim represents number of dimensions
  */
@@ -84,6 +89,26 @@ struct Dim3D {
 		return (d == X) ? x : ((d == Y) ? y : z);
 	}
 
+	Dim3D<T>& operator+=(const Dim3D& rhs)
+	{
+		x += rhs.x;
+		y += rhs.y;
+		z += rhs.z;
+		return *this;
+	}
+	
+	Dim3D<T>& operator-=(const Dim3D& rhs)
+	{
+		x -= rhs.x;
+		y -= rhs.y;
+		z -= rhs.z;
+		return *this;
+	}
+	
+	Dim3D<T> operator-() const {
+		return Dim3D<T>(-x, -y, -z);
+	}
+	
 	template <typename U>
 	operator Dim3D<U>() const {
 		Dim3D<U> t;
@@ -93,6 +118,16 @@ struct Dim3D {
 		return t;
 	}
 };
+
+template <typename T>
+Dim3D<T> operator+(Dim3D<T> lhs, const Dim3D<T>& rhs) {
+	return lhs += rhs;
+}
+
+template <typename T>
+Dim3D<T> operator-(Dim3D<T> lhs, const Dim3D<T>& rhs) {
+	return lhs -= rhs;
+}
 
 /// Check is two Dim3D equal
 template <typename T>

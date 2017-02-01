@@ -8,7 +8,7 @@ aux_source_directory(src RGRID_SRC)
 aux_source_directory(include/rgrid RGRID_INCLUDE)
 
 # specify headers in include to make them visible in some IDEs
-add_library(RGrid SHARED ${RGRID_SRC} ${RGRID_INCLUDE})
+add_library(RGrid ${RGRID_SRC} ${RGRID_INCLUDE})
 
 target_compile_options(RGrid PUBLIC -rdynamic -W -Wall -Wl,--no-undefined -fpermissive)
 
@@ -35,20 +35,31 @@ if(USE_OPENCL)
 endif(USE_OPENCL)
 
 # add installation for target
-install(TARGETS RGrid EXPORT RGridExport
+install(TARGETS RGrid EXPORT RGridConfig
 	ARCHIVE DESTINATION lib
 	LIBRARY DESTINATION lib
 	RUNTIME DESTINATION bin # This is for Windows
 	INCLUDES DESTINATION include)
 
 # create export file which can be imported by other cmake projects
-install(EXPORT RGridExport DESTINATION lib/cmake/RGrid)
+install(EXPORT RGridConfig DESTINATION lib/cmake/RGrid)
 
 # copy public include files
 install(DIRECTORY include/ DESTINATION include)
 
 # This makes the project importable from the build directory
 export(TARGETS RGrid FILE rgridConfig.cmake)
+
+# compile fdcoef generator
+add_executable(FDCGen generators/fdcgen.cpp)
+target_include_directories(FDCGen PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+add_custom_command(
+	OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/src/fdc.cpp
+	COMMAND FDCGen >${CMAKE_CURRENT_SOURCE_DIR}/src/fdc.cpp
+	DEPENDS FDCGen)
+
+target_sources(RGrid PRIVATE src/fdc.cpp)
 
 # Adding tests
 

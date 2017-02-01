@@ -757,7 +757,7 @@ void DArray<T, I>::fillGhostCL(const CartDir &d, const CartSide &s) {
 
 #endif // USE_OPENCL
 
-} // rgrid
+} // namespace rgrid
 
 #endif // RGRID_DARRAY_H
 

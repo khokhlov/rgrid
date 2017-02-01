@@ -7,9 +7,10 @@
 #ifndef RG_PDIM_RAW_H
 #define RG_PDIM_RAW_H
 
-namespace rgrid {
-
 #include "rgrid/types.h"
+#include "rgrid/range.h"
+
+namespace rgrid {
 
 /**
  * \brief This class responsible for sizes of DArray's
@@ -270,7 +271,15 @@ struct PDimRaw {
 		const bool is4 = lhs.m_nc == rhs.m_nc;
 		return is1 && is2 && is3 && is4;
 	}
-
+	
+	Range<T> getRange() const {
+		return r(m_origin, m_local_size);
+	}
+	
+	Range<T> getGhostRange() const {
+		return r(m_origin-m_ghost_size, m_origin+m_local_ghost_size);
+	}
+	
 	/// size of bigger rect structure (global size)
 	Dim3D<T> m_global_size;
 	/// multiplied global sizes in all directions
