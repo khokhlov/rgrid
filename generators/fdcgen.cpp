@@ -8,7 +8,7 @@
 #include "rgrid/fdc.h"
 
 using namespace std;
-using namespace fdcoeff;
+using namespace rgrid;
 using namespace fdc;
 
 int main() {

@@ -98,8 +98,12 @@ struct PDimRaw {
 	 * \param[in] d direction
 	 * \return origin
 	 */
-	T origin(const CartDir d = X) const {
+	T origin(const CartDir d) const {
 		return m_origin[d];
+	}
+	
+	Dim3D<T> origin() const {
+		return m_origin;
 	}
 
 	/**
@@ -273,11 +277,11 @@ struct PDimRaw {
 	}
 	
 	Range<T> getRange() const {
-		return r(m_origin, m_local_size);
+		return Range<T>(m_origin, m_local_size);
 	}
 	
 	Range<T> getGhostRange() const {
-		return r(m_origin-m_ghost_size, m_origin+m_local_ghost_size);
+		return Range<T>(m_origin-m_ghost_size, m_origin+m_local_ghost_size);
 	}
 	
 	/// size of bigger rect structure (global size)

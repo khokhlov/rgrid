@@ -128,6 +128,10 @@ public:
 	DArray<T, I> &getDArrayPart(const I i, const I j, const I k) {
 		return dArray.at(RGCut<I>::linInd(i, j, k));
 	}
+	const DArray<T, I> &getDArrayPart(const I i, const I j, const I k) const {
+		return dArray.at(RGCut<I>::linInd(i, j, k));
+	}
+
 
 	/**
 	 * \brief Equivalent to getDArrayPart()

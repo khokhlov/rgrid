@@ -305,7 +305,9 @@ public:
 	 * \sa rgrid::DArrayScatter<T, I>::getDArrayPart(I x, I y, I z)
 	 */
 	const DArray<T, I> &getDArrayPart(I x, I y, I z) const {
-		return dac.getDArrayPart(x, y, z);
+		const DArrayContainer<T, I>& dac_tmp = dac;
+		const DArray<T, I>& da_temp = dac_tmp.getDArrayPart(x, y, z);
+		return da_temp;
 	}
 	/**
 	 * \brief Get buffer of DArray with indexes (x, y, z) in local DArrayContainer

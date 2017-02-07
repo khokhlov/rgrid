@@ -1,6 +1,8 @@
 #ifndef RGRID_RANGE_H
 #define RGRID_RANGE_H
 
+#include <algorithm>
+
 #include "rgrid/types.h"
 
 namespace rgrid {
@@ -11,7 +13,11 @@ struct Range {
 	static const int R = SIDE_RIGHT;
 	
 	Range() : m_r({Dim3D<I>(0,0,0), Dim3D<I>(0,0,0)}) {}
-	Range(Dim3D<I> l, Dim3D<I> r) : m_r({l, r}) {
+	Range(Dim3D<I> l, Dim3D<I> r) : m_r({l, r}) {}
+	Range(
+		I li, I lj, I lk,
+		I ri, I rj, I rk) : Range(Dim3D<I>(li, lj, lk), Dim3D<I>(ri, rj, rk))
+	{
 	}
 	
 	void set(I v, CartDir d, CartSide s) { 
@@ -26,7 +32,7 @@ struct Range {
 		return m_r[s][d]; 
 	}
 	
-	Dim3D<I> get(CartSide s) const { m_r[s]; }
+	Dim3D<I> get(CartSide s) const { return m_r[s]; }
 	
 	bool isValid() { 
 		return 
@@ -71,12 +77,12 @@ private:
 template <typename I>
 inline Range<I> intersect(const Range<I>& r1, const Range<I>& r2) {
 	Range<I> r;
-	r.set(max(r1.getLeft(X), r2.getLeft(X)), X, Range<I>::L);
-	r.set(max(r1.getRight(X), r2.getRight(X)), X, Range<I>::R);
-	r.set(max(r1.getLeft(Y), r2.getLeft(Y)), Y, Range<I>::L);
-	r.set(min(r1.getRight(Y), r2.getRight(Y)), Y, Range<I>::R);
-	r.set(min(r1.getLeft(Z), r2.getLeft(Z)), Z, Range<I>::L);
-	r.set(min(r1.getRight(Z), r2.getRight(Z)), Z, Range<I>::R);
+	r.set(std::max(r1.get(X, SIDE_LEFT), r2.get(X, SIDE_LEFT)), X, SIDE_LEFT);
+	r.set(std::min(r1.get(X, SIDE_RIGHT), r2.get(X, SIDE_RIGHT)), X, SIDE_RIGHT);
+	r.set(std::max(r1.get(Y, SIDE_LEFT), r2.get(Y, SIDE_LEFT)), Y, SIDE_LEFT);
+	r.set(std::min(r1.get(Y, SIDE_RIGHT), r2.get(Y, SIDE_RIGHT)), Y, SIDE_RIGHT);
+	r.set(std::max(r1.get(Z, SIDE_LEFT), r2.get(Z, SIDE_LEFT)), Z, SIDE_LEFT);
+	r.set(std::min(r1.get(Z, SIDE_RIGHT), r2.get(Z, SIDE_RIGHT)), Z, SIDE_RIGHT);
 	if (!r.isValid()) r.clear();
 	return r;
 }

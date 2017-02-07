@@ -141,6 +141,20 @@ bool operator!=(const Dim3D<T>& lhs, const Dim3D<T>& rhs) {
 	return !(lhs == rhs);
 }
 
+/// PML types
+enum PMLType {
+	PML_DERIV, /// (d/dx)
+	PML_VALUE, /// (x)
+	PML_INVERSE /// (1/x)
+};
+
+/// Offset in staggered grid
+enum StaggeredOffset {
+	OFFSET_NONE,
+	OFFSET_PLUS_HALF,
+	OFFSET_MINUS_HALF
+};
+
 namespace rgio {
 
 /**

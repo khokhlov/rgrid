@@ -51,7 +51,7 @@ install(DIRECTORY include/ DESTINATION include)
 export(TARGETS RGrid FILE rgridConfig.cmake)
 
 # compile fdcoef generator
-add_executable(FDCGen generators/fdcgen.cpp)
+add_executable(FDCGen generators/fdcgen.cpp src/debug.cpp)
 target_include_directories(FDCGen PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_custom_command(

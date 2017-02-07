@@ -8,7 +8,7 @@
 
 #include "rgrid/debug.h"
 
-namespace fdcoeff { 
+namespace rgrid { 
 
 /**
  * \brief compute n!
@@ -71,7 +71,7 @@ public:
 	 */
 	inline double c1(int n) {
 		DEBUG_ASSERT(!m_c1.empty(), "Call calc() first");
-		DEBUG_ASSERT(0 <= n && n < m_c1.size(), "Wrong number of coefficient");
+		DEBUG_ASSERT(0 <= n && n < static_cast<int>(m_c1.size()), "Wrong number of coefficient");
 		if (n >= 0) {
 			return m_c1.at(n);
 		} else {
@@ -81,12 +81,12 @@ public:
 	inline double c2(int n) {
 		n = abs(n);
 		DEBUG_ASSERT(!m_c2.empty(), "Call calc() first");
-		DEBUG_ASSERT(0 <= n && n < m_c2.size(), "Call calc() first");
+		DEBUG_ASSERT(0 <= n && n < static_cast<int>(m_c2.size()), "Call calc() first");
 		return m_c2[abs(n)];
 	}
 	inline double sc1(const int n) const {
 		DEBUG_ASSERT(!m_sc1.empty(), "Call calc() first");
-		DEBUG_ASSERT(0 < n && n <= m_sc1.size(), "Call calc() first");
+		DEBUG_ASSERT(0 < n && n <= static_cast<int>(m_sc1.size()), "Call calc() first");
 		return m_sc1[n-1];
 	}
 	
@@ -96,7 +96,7 @@ private:
 	std::vector<double> m_sc1; // first derivatice staggered coefficients
 };
 
-} // namespace fdcoeff
+} // namespace rgrid
 
 #endif
 

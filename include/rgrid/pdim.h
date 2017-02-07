@@ -42,6 +42,20 @@ struct PDim : public PDimRaw<T> {
 	                    const T ox, const T oy, const T oz,
 	                    const T gx, const T gy, const T gz,
 	                    const T cn);
+	virtual void resize(
+		const Dim3D<T>& b,
+		const Dim3D<T>& p,
+		const Dim3D<T>& o,
+		const Dim3D<T>& g,
+		T cn)
+	{ 
+		resize(
+			b.x, b.y, b.z,
+			p.x, p.y, p.z,
+			o.x, o.y, o.z,
+			g.x, g.y, g.z,
+			cn);
+	}
 	/**
 	 * \brief Set sizes the same as in other PDim
 	 */

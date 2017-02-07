@@ -67,6 +67,16 @@ public:
 		PDim<I>::resize(x, y, z, px, py, pz, ox, oy, oz, gx, gy, gz, cn);
 		alloc();
 	}
+	virtual void resize(
+		const Dim3D<T>& b,
+		const Dim3D<T>& p,
+		const Dim3D<T>& o,
+		const Dim3D<T>& g,
+		T cn)
+	{ 
+		PDim<I>::resize(b,p,o,g,cn);
+		alloc();
+	}
 	/**
 	 * \brief resize this PDim as the other PDim
 	 */
