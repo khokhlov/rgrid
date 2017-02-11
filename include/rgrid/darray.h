@@ -427,6 +427,7 @@ public:
 	void clDtoH();
 
 private:
+	
 	void clInitBuffer();
 	void clReleaseBuffer();
 

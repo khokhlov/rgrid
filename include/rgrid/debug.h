@@ -17,7 +17,7 @@ template <> struct CompileTimeError<false> {};
 #define SA_CAT(X,Y) SA_SUB_CAT(X,Y)
 
 #define STATIC_ASSERT(expr, msg) { \
-	dassert::CompileTimeError<!(expr)> SA_CAT(ERROR__##msg##__LINE_,__LINE__); \
+	dassert::CompileTimeError<!((expr))> SA_CAT(ERROR__##msg##__LINE_,__LINE__); \
 	(void) SA_CAT(ERROR__##msg##__LINE_,__LINE__); }
 
 // debug assert

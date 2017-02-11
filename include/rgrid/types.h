@@ -189,6 +189,18 @@ enum format {
 
 } // namespace rgio
 
+template<typename T, typename U>
+struct IsEqualTypes
+{
+	enum { result = 0 };
+};
+
+template<typename T>
+struct IsEqualTypes<T, T>
+{
+	enum { result = 1 };
+};
+
 } // rgrid
 
 #endif // RGRID_TYPES_H

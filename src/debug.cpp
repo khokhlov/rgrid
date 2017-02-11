@@ -27,7 +27,7 @@ void assert(const char *file, const int line, const char *msg, const char *exp)
 	cerr << "\033[91mASSERT! " << file << ":" << line << ": " << exp << "\033[0m";
 	cerr << " : " << msg << endl;
 	stackTrace();
-	exit(-1);
+	throw std::runtime_error("Let's debug!");
 }
 
 } // namespace dassert
