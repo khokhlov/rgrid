@@ -9,45 +9,26 @@ namespace rgrid {
 
 namespace operators {
 
-template <typename E>
+template <typename T, typename I>
 struct GridOp {
-public:
-	typedef typename E::DataType DataType;
-	typedef typename E::IndexType IndexType;
 private:
-	typedef DataType T;
-	typedef IndexType I;
-	
 	typedef DArrayScatter<T, I> DAS;
 	typedef DArray<T, I> DA;
 	
-	struct OpInput {
-		OpInput(VarOp<T, I>& var, DArrayScatter<T, I>& das)
-		: var(&var), das(&das) {}
-		VarOp<T, I>* var;
-		DArrayScatter<T, I>* das;
-	};
-	
-	typedef std::vector<OpInput> InpContainer;
-	typedef typename InpContainer::iterator InpIterator;
-	
-	InpContainer m_inputs;
-
 public:
+	typedef VarOp<T, I> VarType;
+	typedef ConstOp<T, I> ConstType;
 	
-	void setInput(VarOp<T, I>& var, DAS& das) {
-		m_inputs.push_back(OpInput(var, das));
-	}
-	
-	void apply(const Range<I>& r, E& expr, DAS& out)
+	template <typename Expr>
+	void apply(const Range<I>& r, Expr expr, DAS& out)
 	{
 		for (I gk = 0; gk != out.numParts(Z); ++gk)
 		for (I gj = 0; gj != out.numParts(Y); ++gj)
 		for (I gi = 0; gi != out.numParts(X); ++gi) {
 			DA& nu = out.getDArrayPart(gi, gj, gk);
 			
-			for (InpIterator it = m_inputs.begin(); it != m_inputs.end(); ++it) {
-				it->var->attachInput(it->das->getDArrayPart(gi, gj, gk));
+			for (VarsIt it = m_var_op.begin(); it != m_var_op.end(); ++it) {
+				expr.attachInput(it->first, it->second->getDArrayPart(gi,gj,gk));
 			}
 			
 			Range<I> glob = intersect(r, nu.getRange());
@@ -60,6 +41,21 @@ public:
 			}
 		}
 	}
+	
+	VarType setVar(const std::string& name, DAS& in) {
+		m_var_op.erase(name);
+		m_var_op.insert(std::make_pair(name, &in));
+		return VarType(name);
+	}
+	
+private:
+	typedef std::map<std::string, DAS*> Vars;
+	typedef std::map<std::string, ConstOp<T, I> > Consts;
+	
+	typedef typename Vars::iterator VarsIt;
+	typedef typename Consts::iterator ConstsIt;
+	
+	Vars m_var_op;
 };
 
 /*

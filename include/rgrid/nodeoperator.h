@@ -11,36 +11,6 @@ namespace rgrid {
 
 namespace operators {
 
-struct B {
-	double val;
-};
-	
-template <int N>
-struct A {
-	B val;
-	A<N-1> prev;
-	template <int Num>
-	B& getStruct() {
-		return Num == N ? val : prev.getStruct<Num>();
-	}
-	enum { number = N };
-};
-
-template <>
-struct A<1> {
-	B val;
-	template <int Num>
-	B& getStruct() {
-		STATIC_ASSERT(1 <= Num, Wrong_index);
-		return val;
-	}
-};
-
-void foo() {
-	A<5> a5;
-	(void) a5.getStruct<1>();
-}
-
 /*
  * Leaf operators
  */
@@ -53,9 +23,9 @@ struct ConstOp {
 	T eval(I, I, I) const {
 		return m_val;
 	}
+	void attachInput(const std::string&, DArray<T, I>&) {
+	}
 private:
-	ConstOp(const ConstOp&);
-	ConstOp& operator=(const ConstOp&);
 	const T m_val;
 };
 
@@ -63,18 +33,19 @@ template <typename T, typename I>
 struct VarOp {
 	typedef T DataType;
 	typedef I IndexType;
-	VarOp() : m_da(NULL) {}
-	void attachInput(DArray<T, I>& da) {
-		m_da = &da;
+	VarOp(const std::string& var_name) : m_var_name(var_name), m_da(NULL) {}
+	void attachInput(const std::string& var_name, DArray<T, I>& da) {
+		if (m_var_name == var_name) {
+			m_da = &da;
+		}
 	}
 	T eval(I i, I j, I k) const {
 		DEBUG_ASSERT(m_da != NULL, "VarOp is not initialized");
 		return m_da->val(i, j, k, 0);
 	}
 private:
-	VarOp(const VarOp&);
-	VarOp& operator=(const VarOp&);
 	
+	const std::string m_var_name;
 	DArray<T, I>* m_da;
 };
 
@@ -96,6 +67,9 @@ public:
 		DEBUG_ASSERT(half_order < fdc::MAX_HALF_ORDER,
 			"There are no such precomputed coefficients");
 	}
+	void attachInput(const std::string& var_name, DArray<T, I>& da) {
+		m_e.attachInput(var_name, da);
+	}
 	T eval(I i, I j, I k) const {
 		T result = 0;
 		for (int n = 0; n < m_half_order; ++n) {
@@ -116,12 +90,9 @@ public:
 	
 private:
 	
-	FD1Op(const FD1Op&);
-	FD1Op& operator=(const FD1Op&);
-	
 	const T m_space_step;
 	const I m_half_order;
-	const E& m_e;
+	E m_e;
 };
 
 template <
@@ -141,6 +112,9 @@ public:
 		DEBUG_ASSERT(half_order < fdc::MAX_HALF_ORDER,
 			"There are no such precomputed coefficients");
 	}
+	void attachInput(const std::string& var_name, DArray<T, I>& da) {
+		m_e.attachInput(var_name, da);
+	}
 	T eval(I i, I j, I k) const {
 		T result = 0;
 		for (int n = 0; n < m_half_order; ++n) {
@@ -159,19 +133,17 @@ public:
 		return result;
 	}
 private:
-	BD1Op(const BD1Op&);
-	BD1Op& operator=(const BD1Op&);
 	
 	const T m_space_step;
 	const I m_half_order;
-	const E& m_e;
+	E m_e;
 };
 
 /*
  * Derived operators
  */
 
-template <typename E1, typename E2, typename BinOp>
+template <typename E1, typename E2, template <typename> class BinOp>
 struct BinaryOp {
 public:
 	typedef typename E1::DataType DataType;
@@ -180,23 +152,24 @@ private:
 	typedef DataType T;
 	typedef IndexType I;
 public:
-	BinaryOp(const E1& e1, const E2& e2, const BinOp& op = BinOp()) 
-	: m_e1(e1), m_e2(e2), m_op(op) 
+	BinaryOp(const E1& e1, const E2& e2) 
+	: m_e1(e1), m_e2(e2)
 	{
 		STATIC_ASSERT((IsEqualTypes<typename E1::DataType, typename E2::DataType>::result), Different_data_types);
 		STATIC_ASSERT((IsEqualTypes<typename E1::IndexType, typename E2::IndexType>::result), Different_index_types);
 	}
+	void attachInput(const std::string& var_name, DArray<T, I>& da) {
+		m_e1.attachInput(var_name, da);
+		m_e2.attachInput(var_name, da);
+	}
 	T eval(I i, I j, I k) const {
-		T result = m_op(m_e1.eval(i, j, k), m_e2.eval(i, j, k));
+		T result = BinOp<T>::f(m_e1.eval(i, j, k), m_e2.eval(i, j, k));
 		return result;
 	}
 private:
-	BinaryOp(const BinaryOp&);
-	BinaryOp& operator=(const BinaryOp&);
 	
-	const E1& m_e1;
-	const E2& m_e2;
-	const BinOp& m_op;
+	E1 m_e1;
+	E2 m_e2;
 };
 
 /*
@@ -204,25 +177,27 @@ private:
  */
 template <typename T>
 struct AddOp {
-	AddOp() {}
-	T operator()(const T& e1, const T& e2) const { return e1 + e2; }
+	static T f(const T& e1, const T& e2) { return e1 + e2; }
 };
 
 template <typename T>
 struct SubOp {
-	SubOp() {}
-	T operator()(const T& e1, const T& e2) const { return e1 - e2; }
+	static T f(const T& e1, const T& e2) { return e1 - e2; }
 };
 
 template <typename T>
 struct MulOp {
-	MulOp() {}
-	T operator()(const T& e1, const T& e2) const { return e1 * e2; }
+	static T f(const T& e1, const T& e2) { return e1 * e2; }
+};
+
+template <typename T>
+struct DivOp {
+	static T f(const T& e1, const T& e2) { return e1 / e2; }
 };
 
 
 
-template <typename E, typename UnOp>
+template <typename E, template <typename> class UnOp>
 struct UnaryOp {
 public:
 	typedef typename E::DataType DataType;
@@ -231,17 +206,17 @@ private:
 	typedef DataType T;
 	typedef IndexType I;
 public:
-	UnaryOp(const E& e, const UnOp& op = UnOp()) 
-	: m_e(e), m_op(op) {}
+	UnaryOp(const E& e) 
+	: m_e(e) {}
+	void attachInput(const std::string& var_name, DArray<T, I>& da) {
+		m_e.attachInput(var_name, da);
+	}
 	T eval(I i, I j, I k) const {
-		return m_op(m_e.eval(i, j, k));
+		return UnOp<T>::f(m_e.eval(i, j, k));
 	}
 private:
-	UnaryOp(const UnaryOp&);
-	UnaryOp& operator=(const UnaryOp&);
 	
-	const E& m_e;
-	const UnOp& m_op;
+	E m_e;
 };
 
 /*
@@ -252,6 +227,48 @@ struct NegOp {
 	NegOp() {}
 	T operator()(const T& e) { return -e; }
 };
+
+/*
+ * types creators
+ */
+
+template <typename E1, typename E2>
+inline BinaryOp<E1, E2, MulOp> operator*(const E1& e1, const E2& e2) {
+	return BinaryOp<E1, E2, MulOp>(e1, e2);
+}
+
+template <typename E1, typename E2>
+inline BinaryOp<E1, E2, DivOp> operator/(const E1& e1, const E2& e2) {
+	return BinaryOp<E1, E2, DivOp>(e1, e2);
+}
+
+template <typename E1, typename E2>
+inline BinaryOp<E1, E2, AddOp> operator+(const E1& e1, const E2& e2) {
+	return BinaryOp<E1, E2, AddOp>(e1, e2);
+}
+
+template <typename E1, typename E2>
+inline BinaryOp<E1, E2, SubOp> operator-(const E1& e1, const E2& e2) {
+	return BinaryOp<E1, E2, SubOp>(e1, e2);
+}
+
+template <CartDir D, typename E>
+inline FD1Op<D, E> fd1(
+	typename E::DataType space_step,
+	typename E::IndexType half_order,
+	const E& expr)
+{
+	return FD1Op<D, E>(space_step, half_order, expr);
+}
+
+template <CartDir D, typename E>
+inline BD1Op<D, E> bd1(
+	typename E::DataType space_step, 
+	typename E::IndexType half_order, 
+	const E& expr)
+{
+	return BD1Op<D, E>(space_step, half_order, expr);
+}
 
 } // namespace operators
 
